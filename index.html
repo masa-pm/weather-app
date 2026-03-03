@@ -1060,12 +1060,11 @@ async function fetchAMeDAS(lat, lon) {
     fetch(`${JMA_OBS}/data/latest_time.txt`).then(r => r.text()),
     fetch(`${JMA_OBS}/const/amedastable.json`).then(r => r.json()),
   ]);
-  // "2026-03-03T12:00:00+09:00" → Date オブジェクト（JST として解釈）
+  // "2026-03-03T12:00:00+09:00" → YYYYMMDDHHmmss 形式に変換
   const m = timeText.trim().match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
   if (!m) return null;
-  const base = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+09:00`);
 
-  // 距離順で近い局を最大 5 局取得
+  // 距離順で近い局IDを取得
   const candidates = [];
   for (const [id, st] of Object.entries(table)) {
     if (!st.lat || !st.lon) continue;
@@ -1077,20 +1076,22 @@ async function fetchAMeDAS(lat, lon) {
   candidates.sort((a, b) => a.d - b.d);
   if (!candidates.length) return null;
 
-  // 時刻キー候補を事前生成（latest_time 〜 30 分前、10 分刻み）
+  // map エンドポイント: data/map/{YYYYMMDDHHmmss}.json
   const pad2 = n => String(n).padStart(2, '0');
-  const timeKeys = [];
-  for (let backMin = 0; backMin <= 30; backMin += 10) {
+  const base = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+09:00`);
+
+  // 最大3回遡って試す（10分刻み）
+  for (let backMin = 0; backMin <= 20; backMin += 10) {
     const t = new Date(base.getTime() - backMin * 60000);
     const jst = new Date(t.getTime() + 9 * 3600000);
-    timeKeys.push(`${jst.getUTCFullYear()}${pad2(jst.getUTCMonth()+1)}${pad2(jst.getUTCDate())}_${pad2(jst.getUTCHours())}${pad2(jst.getUTCMinutes())}${pad2(jst.getUTCSeconds())}`);
-  }
-
-  // 近い局から順に試し、全時刻 404 なら次の局へフォールバック
-  for (const { id } of candidates.slice(0, 5)) {
-    for (const timeKey of timeKeys) {
-      const res = await fetch(`${JMA_OBS}/data/point/${id}/${timeKey}.json`);
-      if (res.ok) return res.json();
+    const ts = `${jst.getUTCFullYear()}${pad2(jst.getUTCMonth()+1)}${pad2(jst.getUTCDate())}${pad2(jst.getUTCHours())}${pad2(jst.getUTCMinutes())}00`;
+    const res = await fetch(`${JMA_OBS}/data/map/${ts}.json`);
+    if (res.ok) {
+      const mapData = await res.json();
+      // 最寄りの観測所データを返す
+      for (const { id } of candidates.slice(0, 5)) {
+        if (mapData[id]) return mapData[id];
+      }
     }
   }
   return null;
