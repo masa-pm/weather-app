@@ -580,12 +580,12 @@ body{
   <!-- ═══════════ CALENDAR SCREEN ═══════════ -->
   <div class="screen" id="screen-calendar">
     <div class="cal-hdr">
-      <button class="cal-nav-btn" onclick="calChangeMonth(-1)">&#8249;</button>
+      <button class="cal-nav-btn cal-nav-btn-prev" onclick="calChangeMonth(-1)">&#8249;</button>
       <div>
         <div class="cal-hdr-title" id="cal-hdr-title">2026年 3月</div>
         <div class="cal-hdr-sub">カレンダー</div>
       </div>
-      <button class="cal-nav-btn" onclick="calChangeMonth(1)">&#8250;</button>
+      <button class="cal-nav-btn cal-nav-btn-next" onclick="calChangeMonth(1)">&#8250;</button>
     </div>
     <div class="cal-body">
       <div class="cal-grid-wrap">
@@ -1296,6 +1296,7 @@ function renderCalendar() {
   // 選択日 or 今日のイベントリスト
   const targetKey = calSelectedDate || todayKey;
   renderEventList(targetKey);
+  updateCalNavBtns();
 }
 
 function renderEventList(dateKey) {
@@ -1332,7 +1333,6 @@ function calChangeMonth(delta) {
   const newMonth = calMonth + delta;
   const newYear = calYear + (newMonth < 0 ? -1 : newMonth > 11 ? 1 : 0);
   const normalizedMonth = ((newMonth % 12) + 12) % 12;
-  // 今月〜来月のみ許可
   const todayTotal = today.getFullYear() * 12 + today.getMonth();
   const newTotal   = newYear * 12 + normalizedMonth;
   if (newTotal < todayTotal || newTotal > todayTotal + 1) return;
@@ -1340,6 +1340,16 @@ function calChangeMonth(delta) {
   calYear  = newYear;
   calSelectedDate = null;
   renderCalendar();
+}
+
+function updateCalNavBtns() {
+  const today = new Date();
+  const todayTotal = today.getFullYear() * 12 + today.getMonth();
+  const curTotal   = calYear * 12 + calMonth;
+  const prevBtn = document.querySelector('.cal-nav-btn-prev');
+  const nextBtn = document.querySelector('.cal-nav-btn-next');
+  if (prevBtn) prevBtn.style.opacity = curTotal <= todayTotal ? '0.2' : '1';
+  if (nextBtn) nextBtn.style.opacity = curTotal >= todayTotal + 1 ? '0.2' : '1';
 }
 
 // カレンダータブ切り替え時に描画
