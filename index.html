@@ -1209,22 +1209,27 @@ async function gcalSync() {
     const items = data.items || [];
     if (!items.length) { alert('今後30日間に予定がありません。'); return; }
     if (!confirm('Googleカレンダーから ' + items.length + ' 件の予定を取り込みますか？')) return;
-    const stored = JSON.parse(localStorage.getItem('schedules') || '[]');
-    items.forEach(item => {
+    // Googleから取得した予定で上書き（重複防止）
+    const gcalItems = items.map(item => {
       const start = item.start?.dateTime || item.start?.date || '';
       const end   = item.end?.dateTime   || item.end?.date   || '';
       const isAllDay = !item.start?.dateTime;
-      stored.push({
-        id:        Date.now() + Math.random(),
+      return {
+        id:        'gcal_' + item.id,
         title:     item.summary || '(無題)',
         date:      start.substring(0, 10),
         startTime: isAllDay ? '' : start.substring(11, 16),
         endTime:   isAllDay ? '' : end.substring(11, 16),
         allDay:    isAllDay,
         memo:      item.description || '',
-      });
+        source:    'gcal',
+      };
     });
-    localStorage.setItem('schedules', JSON.stringify(stored));
+    // 手動追加の予定は残し、gcal予定だけ置き換え
+    const stored = JSON.parse(localStorage.getItem('schedules') || '[]');
+    const manual = stored.filter(s => s.source !== 'gcal');
+    localStorage.setItem('schedules', JSON.stringify([...manual, ...gcalItems]));
+    renderCalendar();
     alert(items.length + ' 件を取り込みました！');
   } catch (e) {
     alert('同期中にエラーが発生しました: ' + e.message);
@@ -1323,9 +1328,16 @@ function renderEventList(dateKey) {
 }
 
 function calChangeMonth(delta) {
-  calMonth += delta;
-  if (calMonth < 0)  { calMonth = 11; calYear--; }
-  if (calMonth > 11) { calMonth = 0;  calYear++; }
+  const today = new Date();
+  const newMonth = calMonth + delta;
+  const newYear = calYear + (newMonth < 0 ? -1 : newMonth > 11 ? 1 : 0);
+  const normalizedMonth = ((newMonth % 12) + 12) % 12;
+  // 今月〜来月のみ許可
+  const todayTotal = today.getFullYear() * 12 + today.getMonth();
+  const newTotal   = newYear * 12 + normalizedMonth;
+  if (newTotal < todayTotal || newTotal > todayTotal + 1) return;
+  calMonth = normalizedMonth;
+  calYear  = newYear;
   calSelectedDate = null;
   renderCalendar();
 }
