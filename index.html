@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天気＆スケジュール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1565C0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="天気アプリ">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  min-height:100vh;
+  background:linear-gradient(135deg,#0D47A1 0%,#1565C0 50%,#283593 100%);
+  display:flex;justify-content:center;align-items:center;
+  font-family:'Noto Sans JP','Roboto',sans-serif;
+  padding:20px;
+}
+
+/* ─── Phone Frame ─── */
+.phone{
+  width:390px;height:844px;
+  background:#EFF4FF;
+  border-radius:48px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  position:relative;
+  box-shadow:0 0 0 11px #1a1a2e,0 0 0 13px #333,0 40px 100px rgba(0,0,0,0.55);
+}
+
+/* Punch-hole camera */
+.phone::before{
+  content:'';
+  position:absolute;top:15px;left:50%;transform:translateX(-50%);
+  width:12px;height:12px;border-radius:50%;
+  background:#1a1a2e;z-index:200;
+}
+
+/* ─── Status Bar ─── */
+.status-bar{
+  height:44px;display:flex;align-items:center;justify-content:space-between;
+  padding:10px 28px 0;flex-shrink:0;position:relative;z-index:100;
+}
+.sb-time{font-size:15px;font-weight:700;color:#fff}
+.sb-right{display:flex;align-items:center;gap:5px}
+.sb-right svg{width:16px;height:16px;fill:#fff}
+
+/* ─── Screen ─── */
+.screen{flex:1;overflow:hidden;display:none;flex-direction:column}
+.screen.active{display:flex}
+
+/* ─── Bottom Nav ─── */
+.bottom-nav{
+  height:68px;background:#fff;display:flex;
+  border-top:1px solid #E8EEF8;
+  box-shadow:0 -3px 18px rgba(25,118,210,0.1);
+  padding:0 12px 2px;flex-shrink:0;
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.nav-pill{
+  width:56px;height:30px;border-radius:15px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;transition:background .2s;
+}
+.nav-item.active .nav-pill{background:#DDEEFF}
+.nav-label{font-size:10px;font-weight:500;color:#90A4AE;transition:color .2s}
+.nav-item.active .nav-label{color:#1565C0;font-weight:700}
+
+/* ═══════════════════════════════════════
+   HOME SCREEN
+   ═══════════════════════════════════════ */
+
+/* Weather Header */
+.wx-hdr{
+  background:linear-gradient(165deg,#0D47A1 0%,#1565C0 40%,#1976D2 70%,#42A5F5 100%);
+  padding:2px 24px 22px;color:#fff;flex-shrink:0;
+  position:relative;overflow:hidden;
+}
+.wx-hdr::before{
+  content:'';position:absolute;top:-80px;right:-60px;
+  width:220px;height:220px;border-radius:50%;
+  background:rgba(255,255,255,0.07);
+}
+.wx-hdr::after{
+  content:'';position:absolute;bottom:-50px;left:-40px;
+  width:180px;height:180px;border-radius:50%;
+  background:rgba(255,255,255,0.05);
+}
+.wx-location{
+  display:flex;align-items:center;gap:5px;
+  font-size:14px;font-weight:500;margin-bottom:1px;
+  position:relative;z-index:1;
+}
+.wx-location svg{width:14px;height:14px;fill:rgba(255,255,255,0.9);flex-shrink:0}
+.wx-date{font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:10px;position:relative;z-index:1}
+.wx-main{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;position:relative;z-index:1;
+}
+.wx-emoji{font-size:80px;line-height:1;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.25))}
+.wx-right{text-align:right}
+.wx-temp{font-size:72px;font-weight:300;line-height:1}
+.wx-temp sup{font-size:28px;font-weight:400;vertical-align:super;margin-top:12px;display:inline-block}
+.wx-desc{font-size:15px;color:rgba(255,255,255,0.95);margin-top:2px}
+.wx-range{font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px}
+.wx-stats{
+  display:flex;padding:12px 0 2px;
+  position:relative;z-index:1;
+  border-top:1px solid rgba(255,255,255,0.25);
+}
+.wx-stat{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.wx-stat+.wx-stat{border-left:1px solid rgba(255,255,255,0.22)}
+.wx-stat-ico{font-size:20px}
+.wx-stat-val{font-size:15px;font-weight:700}
+.wx-stat-lbl{font-size:11px;color:rgba(255,255,255,0.75)}
+
+/* Schedule */
+.sch-area{flex:1;overflow-y:auto;padding:14px 14px 6px;scrollbar-width:none}
+.sch-area::-webkit-scrollbar{display:none}
+.sch-ttl{font-size:15px;font-weight:700;color:#1A237E;margin-bottom:10px;padding-left:2px;display:flex;align-items:center;gap:6px}
+
+/* Day Card */
+.day-card{
+  background:#fff;border-radius:18px;padding:14px 16px;
+  margin-bottom:10px;
+  box-shadow:0 2px 14px rgba(25,118,210,0.09);
+  transition:transform .15s;
+}
+.day-card:active{transform:scale(0.99)}
+.day-card.today{
+  border:1.5px solid #BBDEFB;
+  box-shadow:0 4px 22px rgba(25,118,210,0.18);
+}
+.dc-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #EEF2FF;
+}
+.dc-left{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dc-day{font-size:15px;font-weight:700;color:#1A237E}
+.dc-date{font-size:12px;color:#90A4AE}
+.today-chip{
+  font-size:9px;font-weight:700;letter-spacing:.5px;
+  background:#1565C0;color:#fff;
+  padding:2px 7px;border-radius:9px;
+}
+.dc-right{display:flex;align-items:center;gap:4px}
+.dc-wx{font-size:18px}
+.dc-temps{font-size:12px;color:#546E7A;font-weight:600}
+
+/* Events */
+.ev-list{display:flex;flex-direction:column;gap:6px}
+.ev{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px}
+.ev.timed{background:#EFF6FF;border-left:3px solid #1976D2}
+.ev.allday{background:#F1FFF5;border-left:3px solid #43A047}
+.ev-time{font-size:12px;font-weight:700;min-width:44px}
+.ev.timed .ev-time{color:#1565C0}
+.ev.allday .ev-time{color:#2E7D32}
+.ev-title{font-size:13px;font-weight:500;color:#263238;flex:1}
+
+/* ═══════════════════════════════════════
+   CALENDAR SCREEN
+   ═══════════════════════════════════════ */
+.cal-hdr{
+  background:linear-gradient(165deg,#0D47A1 0%,#1976D2 100%);
+  padding:2px 24px 18px;color:#fff;flex-shrink:0;
+}
+.cal-hdr-title{font-size:20px;font-weight:700}
+.cal-hdr-sub{font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px}
+.cal-body{flex:1;overflow-y:auto;scrollbar-width:none}
+.cal-body::-webkit-scrollbar{display:none}
+.cal-grid-wrap{padding:12px 16px 4px}
+.cal-wd-row{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px}
+.cal-wd{font-size:11px;font-weight:700;color:#90A4AE;text-align:center;padding:4px 0}
+.cal-wd:first-child{color:#E53935}
+.cal-wd:last-child{color:#1E88E5}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cd{
+  aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-size:13px;border-radius:50%;cursor:pointer;position:relative;
+  flex-direction:column;gap:2px;transition:background .15s;
+}
+.cd:hover{background:#F0F4FF}
+.cd.sun{color:#E53935}
+.cd.sat{color:#1E88E5}
+.cd.other{color:#D0D8E8}
+.cd.today{background:#1976D2;color:#fff;font-weight:700}
+.cd.today.sun,.cd.today.sat{color:#fff}
+.cd.has-ev::after{
+  content:'';width:5px;height:5px;border-radius:50%;
+  background:#1976D2;position:absolute;bottom:3px;
+}
+.cd.today.has-ev::after{background:#fff}
+
+.cal-ev-list{padding:4px 16px 16px}
+.cal-ev-ttl{font-size:14px;font-weight:700;color:#1A237E;margin-bottom:8px}
+.cal-ev-item{
+  display:flex;align-items:center;gap:10px;
+  background:#fff;border-radius:14px;padding:11px 14px;
+  margin-bottom:7px;
+  box-shadow:0 2px 10px rgba(25,118,210,0.08);
+}
+.cal-ev-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-blue{background:#1976D2}
+.dot-green{background:#43A047}
+.cal-ev-info{flex:1}
+.cal-ev-name{font-size:13px;font-weight:500;color:#263238}
+.cal-ev-time{font-size:11px;color:#90A4AE;margin-top:1px}
+.cal-ev-wx{font-size:18px}
+
+/* ═══════════════════════════════════════
+   SETTINGS SCREEN
+   ═══════════════════════════════════════ */
+.set-hdr{
+  background:linear-gradient(165deg,#0D47A1 0%,#1976D2 100%);
+  padding:2px 24px 20px;color:#fff;flex-shrink:0;
+}
+.set-hdr-title{font-size:20px;font-weight:700;margin-top:6px}
+
+.set-body{flex:1;overflow-y:auto;padding:16px;scrollbar-width:none}
+.set-body::-webkit-scrollbar{display:none}
+
+.set-sec{
+  background:#fff;border-radius:18px;overflow:hidden;
+  margin-bottom:14px;
+  box-shadow:0 2px 14px rgba(25,118,210,0.08);
+}
+.set-sec-lbl{
+  font-size:11px;font-weight:700;color:#1565C0;
+  padding:10px 16px 2px;letter-spacing:.6px;text-transform:uppercase;
+}
+.set-row{display:flex;align-items:center;gap:12px;padding:13px 16px}
+.set-row+.set-row{border-top:1px solid #F0F5FF}
+.set-ico{
+  width:38px;height:38px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:19px;flex-shrink:0;
+}
+.ico-b{background:#E3F2FD}
+.ico-g{background:#E8F5E9}
+.ico-o{background:#FFF3E0}
+.ico-r{background:#FFEBEE}
+.ico-p{background:#F3E5F5}
+.ico-t{background:#E0F2F1}
+.set-info{flex:1;min-width:0}
+.set-lbl{font-size:14px;font-weight:500;color:#263238}
+.set-sub{font-size:12px;color:#90A4AE;margin-top:1px}
+
+/* Status chip */
+.chip{
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:11px;
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
+}
+.chip-on{background:#E8F5E9;color:#2E7D32}
+.chip-on::before{content:'●';font-size:7px;color:#43A047}
+.chip-off{background:#FFF3E0;color:#E65100}
+.chip-off::before{content:'●';font-size:7px;color:#FFA726}
+
+/* Buttons */
+.btn{
+  padding:7px 14px;border-radius:18px;border:none;
+  font-size:12px;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:opacity .2s;white-space:nowrap;
+}
+.btn:active{opacity:.8}
+.btn-disconnect{background:#FFEBEE;color:#C62828}
+.btn-connect-sm{background:#1976D2;color:#fff}
+.btn-danger{background:#FFEBEE;color:#C62828}
+
+/* Text input */
+.set-input{
+  border:1.5px solid #E0E8F4;border-radius:10px;
+  padding:8px 12px;font-size:13px;color:#263238;
+  width:130px;outline:none;font-family:inherit;
+  background:#F8FAFF;transition:border-color .2s;
+}
+.set-input:focus{border-color:#1976D2}
+
+/* Select */
+.set-select{
+  border:1.5px solid #E0E8F4;border-radius:10px;
+  padding:7px 10px;font-size:12px;color:#263238;
+  background:#F8FAFF;font-family:inherit;outline:none;
+}
+
+/* Toggle */
+.toggle{
+  width:48px;height:26px;background:#CFD8DC;
+  border-radius:13px;position:relative;cursor:pointer;
+  transition:background .3s;flex-shrink:0;
+}
+.toggle.on{background:#1976D2}
+.toggle::after{
+  content:'';position:absolute;width:20px;height:20px;
+  background:#fff;border-radius:50%;top:3px;left:3px;
+  transition:left .25s;box-shadow:0 1px 4px rgba(0,0,0,0.3);
+}
+.toggle.on::after{left:25px}
+
+/* ─── Notification Permission Dialog ─── */
+.notif-overlay{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,0.52);
+  z-index:500;display:flex;align-items:flex-end;
+  border-radius:48px;overflow:hidden;
+}
+.notif-sheet{
+  background:#fff;width:100%;
+  border-radius:24px 24px 0 0;
+  padding:8px 24px 36px;
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.notif-handle{
+  width:40px;height:4px;border-radius:2px;
+  background:#E0E0E0;margin:0 auto 18px;
+}
+.notif-ico{
+  width:60px;height:60px;border-radius:18px;
+  background:#E3F2FD;display:flex;
+  align-items:center;justify-content:center;
+  font-size:30px;margin:0 auto 14px;
+}
+.notif-title{
+  font-size:17px;font-weight:700;color:#1A237E;
+  text-align:center;margin-bottom:10px;
+}
+.notif-body{
+  font-size:13px;color:#546E7A;line-height:1.7;
+  text-align:center;margin-bottom:22px;
+}
+.notif-example{
+  background:#F5F9FF;border-radius:12px;
+  padding:10px 14px;margin-bottom:20px;font-size:12px;color:#455A64;line-height:1.6;
+}
+.notif-btn-allow{
+  width:100%;padding:14px;
+  background:linear-gradient(90deg,#1565C0,#1976D2);
+  color:#fff;border:none;border-radius:14px;
+  font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  box-shadow:0 4px 14px rgba(25,118,210,0.35);
+}
+.notif-btn-later{
+  width:100%;padding:12px;
+  background:none;color:#90A4AE;
+  border:none;font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px;
+}
+
+/* ─── Settings: notification status badge ─── */
+.notif-status-badge{
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;
+  background:#FFF3E0;color:#E65100;white-space:nowrap;
+}
+.notif-status-badge.granted{background:#E8F5E9;color:#2E7D32}
+
+/* Save button */
+.save-btn{
+  width:100%;padding:15px;
+  background:linear-gradient(90deg,#1565C0,#1976D2);
+  color:#fff;border:none;border-radius:16px;
+  font-size:15px;font-weight:700;cursor:pointer;
+  font-family:inherit;
+  box-shadow:0 5px 18px rgba(25,118,210,0.4);
+  margin:4px 0 20px;transition:transform .1s;
+}
+.save-btn:active{transform:scale(0.98)}
+
+/* ─── Mobile: full screen (≤600px) ─── */
+@media (max-width: 600px) {
+  body {
+    background: #EFF4FF;
+    padding: 0;
+    display: block;
+  }
+  .phone {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .phone::before { display: none; }
+  .status-bar { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span class="sb-time" id="sbTime">9:41</span>
+    <div class="sb-right">
+      <!-- Signal -->
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <!-- Battery -->
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+  </div>
+
+  <!-- ═══════════ HOME SCREEN ═══════════ -->
+  <div class="screen active" id="screen-home">
+
+    <!-- Weather Header -->
+    <div class="wx-hdr">
+      <div class="wx-location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        <span id="wx-location-text">取得中…</span>
+      </div>
+      <div class="wx-date" id="wx-date-text">--</div>
+      <div class="wx-main">
+        <span class="wx-emoji" id="wx-emoji">☀️</span>
+        <div class="wx-right">
+          <div class="wx-temp"><span id="wx-temp-val">--</span><sup>°C</sup></div>
+          <div class="wx-desc" id="wx-desc-text">--</div>
+          <div class="wx-range" id="wx-range-text">最高 --° / 最低 --°</div>
+        </div>
+      </div>
+      <div class="wx-stats">
+        <div class="wx-stat">
+          <span class="wx-stat-ico">🌂</span>
+          <span class="wx-stat-val" id="wx-rain-val">--%</span>
+          <span class="wx-stat-lbl">降水確率</span>
+        </div>
+        <div class="wx-stat">
+          <span class="wx-stat-ico">💧</span>
+          <span class="wx-stat-val" id="wx-humidity-val">--%</span>
+          <span class="wx-stat-lbl">湿度</span>
+        </div>
+        <div class="wx-stat">
+          <span class="wx-stat-ico">💨</span>
+          <span class="wx-stat-val" id="wx-wind-val">--m/s</span>
+          <span class="wx-stat-lbl">風速</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schedule Scroll Area -->
+    <div class="sch-area">
+      <div class="sch-ttl">📅 今週の予定</div>
+
+      <!-- Today -->
+      <div class="day-card today" data-day-offset="0">
+        <div class="dc-hdr">
+          <div class="dc-left">
+            <span class="dc-day">今日</span>
+            <span class="today-chip">TODAY</span>
+            <span class="dc-date">2/21 土</span>
+          </div>
+          <div class="dc-right">
+            <span class="dc-wx">☀️</span>
+            <span class="dc-temps">27°/16°</span>
+          </div>
+        </div>
+        <div class="ev-list">
+          <div class="ev timed">
+            <span class="ev-time">10:00</span>
+            <span class="ev-title">チームミーティング</span>
+          </div>
+          <div class="ev timed">
+            <span class="ev-time">14:00</span>
+            <span class="ev-title">クライアント訪問</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 翌日予定なし → カード非表示 -->
+
+      <!-- +2日 -->
+      <div class="day-card" data-day-offset="2">
+        <div class="dc-hdr">
+          <div class="dc-left">
+            <span class="dc-day">明後日</span>
+            <span class="dc-date">2/23 月</span>
+          </div>
+          <div class="dc-right">
+            <span class="dc-wx">🌧️</span>
+            <span class="dc-temps">18°/13°</span>
+          </div>
+        </div>
+        <div class="ev-list">
+          <div class="ev allday">
+            <span class="ev-time">終日</span>
+            <span class="ev-title">社内研修</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- +3日 -->
+      <div class="day-card" data-day-offset="3">
+        <div class="dc-hdr">
+          <div class="dc-left">
+            <span class="dc-day">火曜日</span>
+            <span class="dc-date">2/24 火</span>
+          </div>
+          <div class="dc-right">
+            <span class="dc-wx">☀️</span>
+            <span class="dc-temps">21°/14°</span>
+          </div>
+        </div>
+        <div class="ev-list">
+          <div class="ev timed">
+            <span class="ev-time">15:00</span>
+            <span class="ev-title">部門会議</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- +4日 -->
+      <div class="day-card" data-day-offset="4">
+        <div class="dc-hdr">
+          <div class="dc-left">
+            <span class="dc-day">水曜日</span>
+            <span class="dc-date">2/25 水</span>
+          </div>
+          <div class="dc-right">
+            <span class="dc-wx">⛅</span>
+            <span class="dc-temps">20°/13°</span>
+          </div>
+        </div>
+        <div class="ev-list">
+          <div class="ev timed">
+            <span class="ev-time">12:00</span>
+            <span class="ev-title">ランチ会</span>
+          </div>
+          <div class="ev timed">
+            <span class="ev-time">18:00</span>
+            <span class="ev-title">社内懇親会</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- +5日予定なし → カード非表示 -->
+
+      <!-- +6日 -->
+      <div class="day-card" data-day-offset="6">
+        <div class="dc-hdr">
+          <div class="dc-left">
+            <span class="dc-day">金曜日</span>
+            <span class="dc-date">2/27 金</span>
+          </div>
+          <div class="dc-right">
+            <span class="dc-wx">🌧️</span>
+            <span class="dc-temps">17°/12°</span>
+          </div>
+        </div>
+        <div class="ev-list">
+          <div class="ev allday">
+            <span class="ev-time">終日</span>
+            <span class="ev-title">有給休暇</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /sch-area -->
+  </div><!-- /screen-home -->
+
+  <!-- ═══════════ CALENDAR SCREEN ═══════════ -->
+  <div class="screen" id="screen-calendar">
+    <div class="cal-hdr">
+      <div class="cal-hdr-title">2026年 2月</div>
+      <div class="cal-hdr-sub">カレンダー</div>
+    </div>
+    <div class="cal-body">
+      <div class="cal-grid-wrap">
+        <div class="cal-wd-row">
+          <div class="cal-wd">日</div><div class="cal-wd">月</div>
+          <div class="cal-wd">火</div><div class="cal-wd">水</div>
+          <div class="cal-wd">木</div><div class="cal-wd">金</div>
+          <div class="cal-wd">土</div>
+        </div>
+        <div class="cal-days">
+          <!-- Feb 2026: starts Sunday -->
+          <div class="cd sun has-ev">1</div>
+          <div class="cd has-ev">2</div>
+          <div class="cd">3</div>
+          <div class="cd has-ev">4</div>
+          <div class="cd">5</div>
+          <div class="cd">6</div>
+          <div class="cd sat">7</div>
+
+          <div class="cd sun">8</div>
+          <div class="cd has-ev">9</div>
+          <div class="cd">10</div>
+          <div class="cd">11</div>
+          <div class="cd has-ev">12</div>
+          <div class="cd has-ev">13</div>
+          <div class="cd sat">14</div>
+
+          <div class="cd sun has-ev">15</div>
+          <div class="cd">16</div>
+          <div class="cd">17</div>
+          <div class="cd has-ev">18</div>
+          <div class="cd">19</div>
+          <div class="cd">20</div>
+          <div class="cd sat today has-ev">21</div>
+
+          <div class="cd sun has-ev">22</div>
+          <div class="cd has-ev">23</div>
+          <div class="cd has-ev">24</div>
+          <div class="cd has-ev">25</div>
+          <div class="cd has-ev">26</div>
+          <div class="cd has-ev">27</div>
+          <div class="cd sat">28</div>
+        </div>
+      </div>
+      <div class="cal-ev-list">
+        <div class="cal-ev-ttl">📅 今日の予定 — 2/21（土）</div>
+        <div class="cal-ev-item">
+          <div class="cal-ev-dot dot-blue"></div>
+          <div class="cal-ev-info">
+            <div class="cal-ev-name">チームミーティング</div>
+            <div class="cal-ev-time">10:00 〜 11:00</div>
+          </div>
+          <span class="cal-ev-wx">☀️</span>
+        </div>
+        <div class="cal-ev-item">
+          <div class="cal-ev-dot dot-blue"></div>
+          <div class="cal-ev-info">
+            <div class="cal-ev-name">クライアント訪問</div>
+            <div class="cal-ev-time">14:00 〜 15:30</div>
+          </div>
+          <span class="cal-ev-wx">☀️</span>
+        </div>
+        <div class="cal-ev-ttl" style="margin-top:14px">📅 明日の予定 — 2/22（日）</div>
+        <div class="cal-ev-item">
+          <div class="cal-ev-dot dot-blue"></div>
+          <div class="cal-ev-info">
+            <div class="cal-ev-name">朝礼</div>
+            <div class="cal-ev-time">09:00 〜 09:30</div>
+          </div>
+          <span class="cal-ev-wx">⛅</span>
+        </div>
+        <div class="cal-ev-item">
+          <div class="cal-ev-dot dot-blue"></div>
+          <div class="cal-ev-info">
+            <div class="cal-ev-name">ランチMTG</div>
+            <div class="cal-ev-time">13:00 〜 14:00</div>
+          </div>
+          <span class="cal-ev-wx">⛅</span>
+        </div>
+        <div class="cal-ev-item">
+          <div class="cal-ev-dot dot-green"></div>
+          <div class="cal-ev-info">
+            <div class="cal-ev-name">社内研修（2/23）</div>
+            <div class="cal-ev-time">終日</div>
+          </div>
+          <span class="cal-ev-wx">🌧️</span>
+        </div>
+      </div>
+    </div>
+  </div><!-- /screen-calendar -->
+
+  <!-- ═══════════ SETTINGS SCREEN ═══════════ -->
+  <div class="screen" id="screen-settings">
+    <div class="set-hdr">
+      <div class="set-hdr-title">⚙️ 設定</div>
+    </div>
+    <div class="set-body">
+
+      <!-- Google Calendar -->
+      <div class="set-sec">
+        <div class="set-sec-lbl">カレンダー連携</div>
+        <div class="set-row">
+          <div class="set-ico ico-b">📅</div>
+          <div class="set-info">
+            <div class="set-lbl">Googleカレンダー</div>
+            <div class="set-sub">user@gmail.com</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <span class="chip chip-on" id="gcalChip">接続済み</span>
+            <button class="btn btn-disconnect" id="gcalBtn" onclick="toggleGcal()">解除する</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weather Settings -->
+      <div class="set-sec">
+        <div class="set-sec-lbl">天気設定</div>
+        <div class="set-row">
+          <div class="set-ico ico-o">📍</div>
+          <div class="set-info">
+            <div class="set-lbl">現在地を使用</div>
+            <div class="set-sub">GPS から自動取得</div>
+          </div>
+          <div class="toggle on" id="toggle-gps" onclick="onGpsToggle(this)"></div>
+        </div>
+        <div class="set-row">
+          <div class="set-ico ico-b">🌍</div>
+          <div class="set-info">
+            <div class="set-lbl">地域設定</div>
+            <div class="set-sub" id="loc-status">手動で入力</div>
+          </div>
+          <input class="set-input" id="input-location" type="text"
+                 value="渋谷区, 東京都" disabled style="opacity:0.45">
+        </div>
+        <div class="set-row">
+          <div class="set-ico ico-t">🌡️</div>
+          <div class="set-info">
+            <div class="set-lbl">温度単位</div>
+            <div class="set-sub">摂氏 / 華氏</div>
+          </div>
+          <select class="set-select">
+            <option>°C（摂氏）</option>
+            <option>°F（華氏）</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="set-sec">
+        <div class="set-sec-lbl" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px">
+          通知設定
+          <span class="notif-status-badge" id="notifBadge">未許可</span>
+        </div>
+        <div class="set-row">
+          <div class="set-ico ico-p">🔔</div>
+          <div class="set-info">
+            <div class="set-lbl">予定リマインダー</div>
+            <div class="set-sub">毎朝7:00に当日の予定をお知らせ</div>
+          </div>
+          <div class="toggle on" id="toggle-schedule" onclick="onToggle(this,'notif_schedule')"></div>
+        </div>
+        <div class="set-row">
+          <div class="set-ico ico-b">🌧️</div>
+          <div class="set-info">
+            <div class="set-lbl">雨の通知</div>
+            <div class="set-sub">降水確率30%以上の日にお知らせ</div>
+          </div>
+          <div class="toggle on" id="toggle-rain" onclick="onToggle(this,'notif_rain')"></div>
+        </div>
+        <div class="set-row">
+          <div class="set-ico ico-o">🌅</div>
+          <div class="set-info">
+            <div class="set-lbl">朝の天気まとめ</div>
+            <div class="set-sub">毎朝7:00に天気＋予定をまとめて</div>
+          </div>
+          <div class="toggle on" id="toggle-morning" onclick="onToggle(this,'notif_morning')"></div>
+        </div>
+        <div class="set-row" style="justify-content:center">
+          <button class="btn btn-connect-sm" onclick="openNotifPermission()" style="width:100%;padding:11px;font-size:13px">
+            🔔 通知の許可設定を開く
+          </button>
+        </div>
+      </div>
+
+      <!-- App Info -->
+      <div class="set-sec">
+        <div class="set-sec-lbl">アプリ情報</div>
+        <div class="set-row">
+          <div class="set-ico ico-g">ℹ️</div>
+          <div class="set-info">
+            <div class="set-lbl">バージョン</div>
+            <div class="set-sub">v1.0.0</div>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-ico ico-r">🗑️</div>
+          <div class="set-info">
+            <div class="set-lbl">データをリセット</div>
+            <div class="set-sub">すべての設定を初期化</div>
+          </div>
+          <button class="btn btn-danger">リセット</button>
+        </div>
+      </div>
+
+      <button class="save-btn" id="save-btn" onclick="saveWeatherSettings(this)">
+        変更を保存する
+      </button>
+
+    </div><!-- /set-body -->
+  </div><!-- /screen-settings -->
+
+  <!-- ─── Notification Permission Dialog ─── -->
+  <div class="notif-overlay" id="notifOverlay" style="display:none">
+    <div class="notif-sheet">
+      <div class="notif-handle"></div>
+      <div class="notif-ico">🔔</div>
+      <div class="notif-title">通知を許可しますか？</div>
+      <div class="notif-body">
+        毎朝7:00に天気と予定をお知らせします。<br>
+        雨の日には傘のリマインドもお届けします。
+      </div>
+      <div class="notif-example">
+        🌧 今日は雨の可能性があります（降水確率70%）。傘を忘れずに！<br>
+        📅 今日の予定：チームミーティング 10:00
+      </div>
+      <button class="notif-btn-allow" onclick="requestNotifPermission()">🔔 通知を許可する</button>
+      <button class="notif-btn-later" onclick="dismissNotifDialog()">後で設定する</button>
+    </div>
+  </div>
+
+  <!-- ─── Bottom Navigation ─── -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="switchScreen('home',this)">
+      <div class="nav-pill">🏠</div>
+      <span class="nav-label">ホーム</span>
+    </div>
+    <div class="nav-item" onclick="switchScreen('calendar',this)">
+      <div class="nav-pill">📅</div>
+      <span class="nav-label">カレンダー</span>
+    </div>
+    <div class="nav-item" onclick="switchScreen('settings',this)">
+      <div class="nav-pill">⚙️</div>
+      <span class="nav-label">設定</span>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+// ─── Japan Meteorological Agency API ──────────────────────────────────────────
+const JMA_FC  = 'https://www.jma.go.jp/bosai/forecast/data/forecast';
+const JMA_OBS = 'https://www.jma.go.jp/bosai/amedas';
+
+// 都道府県代表地点と JMA 予報区コード [緯度, 経度, コード, 名称]
+const JMA_PREFS = [
+  [43.06, 141.35, '016000', '北海道'],  [40.82, 140.74, '020000', '青森県'],
+  [39.70, 141.13, '030000', '岩手県'],  [38.27, 140.87, '040000', '宮城県'],
+  [39.72, 140.10, '050000', '秋田県'],  [38.24, 140.36, '060000', '山形県'],
+  [37.75, 140.47, '070000', '福島県'],  [36.34, 140.45, '080000', '茨城県'],
+  [36.57, 139.88, '090000', '栃木県'],  [36.39, 139.06, '100000', '群馬県'],
+  [35.86, 139.65, '110000', '埼玉県'],  [35.61, 140.12, '120000', '千葉県'],
+  [35.69, 139.69, '130000', '東京都'],  [35.45, 139.64, '140000', '神奈川県'],
+  [37.90, 139.02, '150000', '新潟県'],  [36.70, 137.21, '160000', '富山県'],
+  [36.59, 136.63, '170000', '石川県'],  [36.06, 136.22, '180000', '福井県'],
+  [35.66, 138.57, '190000', '山梨県'],  [36.65, 138.18, '200000', '長野県'],
+  [35.39, 136.72, '210000', '岐阜県'],  [34.97, 138.38, '220000', '静岡県'],
+  [35.18, 136.91, '230000', '愛知県'],  [34.73, 136.51, '240000', '三重県'],
+  [35.00, 135.87, '250000', '滋賀県'],  [35.02, 135.76, '260000', '京都府'],
+  [34.69, 135.50, '270000', '大阪府'],  [34.69, 135.18, '280000', '兵庫県'],
+  [34.69, 135.83, '290000', '奈良県'],  [34.23, 135.17, '300000', '和歌山県'],
+  [35.50, 134.24, '310000', '鳥取県'],  [35.47, 133.05, '320000', '島根県'],
+  [34.66, 133.93, '330000', '岡山県'],  [34.40, 132.46, '340000', '広島県'],
+  [34.19, 131.47, '350000', '山口県'],  [34.07, 134.56, '360000', '徳島県'],
+  [34.34, 134.04, '370000', '香川県'],  [33.84, 132.77, '380000', '愛媛県'],
+  [33.56, 133.53, '390000', '高知県'],  [33.61, 130.42, '400000', '福岡県'],
+  [33.25, 130.30, '410000', '佐賀県'],  [32.74, 129.87, '420000', '長崎県'],
+  [32.79, 130.74, '430000', '熊本県'],  [33.24, 131.61, '440000', '大分県'],
+  [31.91, 131.42, '450000', '宮崎県'],  [31.56, 130.56, '460100', '鹿児島県'],
+  [26.21, 127.68, '471000', '沖縄県'],
+];
+
+// JST の日付キー (YYYY-MM-DD) を返す — UTC との時差を補正
+function jstDateKey(d) {
+  const jst = new Date(d.getTime() + 9 * 3600 * 1000);
+  return jst.toISOString().slice(0, 10);
+}
+
+function getNearestPref(lat, lon) {
+  let best = JMA_PREFS[0], minD = Infinity;
+  for (const p of JMA_PREFS) {
+    const d = (lat - p[0]) ** 2 + (lon - p[1]) ** 2;
+    if (d < minD) { minD = d; best = p; }
+  }
+  return { code: best[2], name: best[3] };
+}
+
+// 気象庁天気コード → 絵文字
+function jmaWxEmoji(code) {
+  const n = parseInt(code) || 0;
+  if (n >= 400) return '❄️';
+  if (n >= 260) return '🌧️';
+  if (n >= 240) return '🌨️';
+  if (n >= 202) return '🌧️';
+  if (n === 201) return '⛅';
+  if (n === 200) return '☁️';
+  if (n >= 160) return '🌨️';
+  if (n === 140) return '⛈️';
+  if (n === 132) return '⛅';
+  if (n >= 130) return '🌤️';
+  if (n >= 126) return '🌦️';
+  if (n >= 120) return '🌦️';
+  if (n >= 115) return '🌨️';
+  if (n >= 112) return '🌦️';
+  if (n === 111) return '⛅';
+  if (n === 110) return '🌤️';
+  if (n >= 104 && n <= 107) return '🌨️';
+  if (n >= 102) return '🌦️';
+  if (n === 101) return '🌤️';
+  return '☀️';
+}
+
+function applyDates() {
+  const now = new Date();
+  const dayNames = ['日','月','火','水','木','金','土'];
+  const dayKanji = ['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日'];
+  document.getElementById('wx-date-text').textContent =
+    `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日（${dayNames[now.getDay()]}）`;
+
+  const base = new Date(now); base.setHours(0, 0, 0, 0);
+  document.querySelectorAll('[data-day-offset]').forEach(card => {
+    const offset = parseInt(card.dataset.dayOffset);
+    const d = new Date(base); d.setDate(base.getDate() + offset);
+    const dayEl  = card.querySelector('.dc-day');
+    const dateEl = card.querySelector('.dc-date');
+    const chipEl = card.querySelector('.today-chip');
+    if (dayEl) {
+      if (offset === 0)      dayEl.textContent = '今日';
+      else if (offset === 1) dayEl.textContent = '明日';
+      else if (offset === 2) dayEl.textContent = '明後日';
+      else                   dayEl.textContent = dayKanji[d.getDay()];
+    }
+    if (dateEl) dateEl.textContent = `${d.getMonth()+1}/${d.getDate()} ${dayNames[d.getDay()]}`;
+    if (chipEl) chipEl.style.display = offset === 0 ? '' : 'none';
+  });
+}
+
+function initWeather() {
+  applyDates();
+  const useGps = localStorage.getItem('wx_use_gps') !== 'false'; // デフォルト: GPS ON
+
+  if (useGps) {
+    if (!navigator.geolocation) { loadWeatherData(35.6895, 139.6917); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => loadWeatherData(p.coords.latitude, p.coords.longitude),
+      () => loadWeatherData(35.6895, 139.6917),
+      { timeout: 8000 }
+    );
+  } else {
+    const query = localStorage.getItem('wx_manual_location') || '渋谷区, 東京都';
+    geocodeLocation(query)
+      .then(r => {
+        if (r) {
+          loadWeatherData(r.lat, r.lon);
+          const el = document.getElementById('loc-status');
+          if (el) el.textContent = `→ ${r.title}`;
+        } else {
+          loadWeatherData(35.6895, 139.6917);
+        }
+      })
+      .catch(() => loadWeatherData(35.6895, 139.6917));
+  }
+}
+
+// ─── 地域設定（国土地理院ジオコーディング連携） ──────────────────────────────
+const GSI_GEOCODE = 'https://msearch.gsi.go.jp/address-search/AddressSearch?q=';
+
+async function geocodeLocation(query) {
+  if (!query.trim()) return null;
+  const res  = await fetch(GSI_GEOCODE + encodeURIComponent(query.trim()));
+  const data = await res.json();
+  if (!Array.isArray(data) || data.length === 0) return null;
+  const [lon, lat] = data[0].geometry.coordinates; // GeoJSON は [lon, lat] の順
+  return { lat, lon, title: data[0].properties.title };
+}
+
+// トグル変更ハンドラ
+function onGpsToggle(el) {
+  el.classList.toggle('on');
+  const useGps = el.classList.contains('on');
+  const input  = document.getElementById('input-location');
+  input.disabled    = useGps;
+  input.style.opacity = useGps ? '0.45' : '1';
+  localStorage.setItem('wx_use_gps', useGps ? 'true' : 'false');
+  // GPS ON に切り替えたら即リロード
+  if (useGps) initWeather();
+}
+
+// 「変更を保存する」ボタン
+async function saveWeatherSettings(btn) {
+  btn.textContent = '保存中…';
+  btn.disabled    = true;
+
+  const useGps  = document.getElementById('toggle-gps').classList.contains('on');
+  const locText = document.getElementById('input-location').value.trim();
+  localStorage.setItem('wx_use_gps',           useGps ? 'true' : 'false');
+  localStorage.setItem('wx_manual_location',   locText);
+
+  if (useGps) {
+    initWeather();
+  } else {
+    const statusEl = document.getElementById('loc-status');
+    statusEl.textContent = '検索中…';
+    let coords = null;
+    try {
+      const r = await geocodeLocation(locText);
+      if (r) {
+        coords = r;
+        statusEl.textContent = `→ ${r.title}`;
+      } else {
+        statusEl.textContent = '場所が見つかりませんでした';
+      }
+    } catch (e) {
+      statusEl.textContent = '取得エラー';
+      console.error('[Geocode]', e);
+    }
+    // ジオコーディング成否にかかわらず天気を更新
+    loadWeatherData(coords?.lat ?? 35.6895, coords?.lon ?? 139.6917);
+  }
+
+  btn.disabled    = false;
+  btn.textContent = '✓ 保存しました';
+  setTimeout(() => { btn.textContent = '変更を保存する'; }, 2000);
+}
+
+// ページ起動時の設定復元
+function loadWeatherSettings() {
+  const useGps  = localStorage.getItem('wx_use_gps') !== 'false';
+  const locText = localStorage.getItem('wx_manual_location') || '渋谷区, 東京都';
+
+  const toggle = document.getElementById('toggle-gps');
+  const input  = document.getElementById('input-location');
+  if (!toggle || !input) return;
+
+  if (useGps) toggle.classList.add('on');
+  else        toggle.classList.remove('on');
+
+  input.value         = locText;
+  input.disabled      = useGps;
+  input.style.opacity = useGps ? '0.45' : '1';
+}
+
+async function loadWeatherData(lat, lon) {
+  const pref = getNearestPref(lat, lon);
+  document.getElementById('wx-location-text').textContent = pref.name;
+
+  // GPS モード時は設定画面の loc-status にも都道府県名を反映
+  const useGps = localStorage.getItem('wx_use_gps') !== 'false';
+  if (useGps) {
+    const statusEl = document.getElementById('loc-status');
+    if (statusEl) statusEl.textContent = `現在地: ${pref.name}`;
+  }
+
+  // 予報データ（メイン・即時表示）
+  fetch(`${JMA_FC}/${pref.code}.json`)
+    .then(r => r.json())
+    .then(fc => { applyForecastHeader(fc); applyForecastCards(fc); })
+    .catch(e => console.error('[JMA forecast]', e));
+
+  // AMeDAS 実況（気温・湿度・風速 — 非同期で後から上書き）
+  fetchAMeDAS(lat, lon)
+    .then(obs => { if (obs) applyObservations(obs); })
+    .catch(e => console.warn('[AMeDAS]', e));
+}
+
+// AMeDAS 観測所テーブルを取得し、最寄り観測所の最新実況を返す
+async function fetchAMeDAS(lat, lon) {
+  const [timeText, table] = await Promise.all([
+    fetch(`${JMA_OBS}/data/latest_time.txt`).then(r => r.text()),
+    fetch(`${JMA_OBS}/const/amedastable.json`).then(r => r.json()),
+  ]);
+  // "2026-03-03T12:00:00+09:00" → "20260303_120000"
+  const m = timeText.trim().match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const timeKey = `${m[1]}${m[2]}${m[3]}_${m[4]}${m[5]}${m[6]}`;
+
+  // 最寄りの観測所を探索
+  let bestId = null, minD = Infinity;
+  for (const [id, st] of Object.entries(table)) {
+    if (!st.lat || !st.lon) continue;
+    const sLat = st.lat[0] + st.lat[1] / 60;
+    const sLon = st.lon[0] + st.lon[1] / 60;
+    const d = (lat - sLat) ** 2 + (lon - sLon) ** 2;
+    if (d < minD) { minD = d; bestId = id; }
+  }
+  if (!bestId) return null;
+  return fetch(`${JMA_OBS}/data/point/${bestId}/${timeKey}.json`).then(r => r.json());
+}
+
+// 短期予報（fc[0]）をホームヘッダーに反映
+function applyForecastHeader(fc) {
+  const ts      = fc[0]?.timeSeries || [];
+  const wxArea  = ts[0]?.areas?.[0];
+  const popTs   = ts[1];
+  const tmpArea = ts[2]?.areas?.[0];
+
+  // 天気絵文字・説明文
+  const code = wxArea?.weatherCodes?.[0];
+  const desc = (wxArea?.weathers?.[0] || '').replace(/　/g, '');
+  if (code) document.getElementById('wx-emoji').textContent = jmaWxEmoji(code);
+  document.getElementById('wx-desc-text').textContent = desc || '--';
+
+  // 今日の降水確率（6時間スロットの最大値）
+  const todayKey = jstDateKey(new Date());
+  let maxPop = 0;
+  popTs?.timeDefines?.forEach((td, i) => {
+    if (td.startsWith(todayKey)) {
+      const v = parseInt(popTs.areas?.[0]?.pops?.[i]);
+      if (!isNaN(v)) maxPop = Math.max(maxPop, v);
+    }
+  });
+  document.getElementById('wx-rain-val').textContent = maxPop + '%';
+  TODAY_RAIN_PROB = maxPop;
+
+  // 今日の最高・最低気温（予報値 — AMeDAS で後から上書き）
+  const tMax = tmpArea?.tempsMax?.[0];
+  const tMin = tmpArea?.tempsMin?.[0];
+  const maxStr = tMax && tMax !== '' ? Math.round(parseFloat(tMax)) : '--';
+  const minStr = tMin && tMin !== '' ? Math.round(parseFloat(tMin)) : '--';
+  document.getElementById('wx-temp-val').textContent = maxStr;
+  document.getElementById('wx-range-text').textContent = `最高 ${maxStr}° / 最低 ${minStr}°`;
+}
+
+// AMeDAS 実況値（気温・湿度・風速）を上書き反映
+function applyObservations(obs) {
+  if (Array.isArray(obs.temp) && obs.temp[1] === 0)
+    document.getElementById('wx-temp-val').textContent = Math.round(obs.temp[0]);
+  document.getElementById('wx-humidity-val').textContent =
+    Array.isArray(obs.humidity) && obs.humidity[1] === 0
+      ? Math.round(obs.humidity[0]) + '%' : '--';
+  document.getElementById('wx-wind-val').textContent =
+    Array.isArray(obs.wind) && obs.wind[1] === 0
+      ? obs.wind[0].toFixed(1) + 'm/s' : '--';
+}
+
+// 週間予報（fc[1]）を各日付カードに反映
+function applyForecastCards(fc) {
+  const wk    = fc[1]?.timeSeries || [];
+  const wxTs  = wk[0];   // 天気コード + 降水確率
+  const tmpTs = wk[1];   // 最高/最低気温
+  if (!wxTs) return;
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  document.querySelectorAll('[data-day-offset]').forEach(card => {
+    const offset    = parseInt(card.dataset.dayOffset);
+    const target    = new Date(today); target.setDate(today.getDate() + offset);
+    const targetKey = jstDateKey(target);
+
+    const idx = wxTs.timeDefines?.findIndex(td => td.startsWith(targetKey));
+    if (idx < 0) return;
+
+    const wxArea  = wxTs.areas?.[0];
+    const tmpArea = tmpTs?.areas?.[0];
+    const code    = wxArea?.weatherCodes?.[idx];
+    const tMax    = tmpArea?.tempsMax?.[idx];
+    const tMin    = tmpArea?.tempsMin?.[idx];
+
+    const wxEl = card.querySelector('.dc-wx');
+    const tmEl = card.querySelector('.dc-temps');
+    if (wxEl && code) wxEl.textContent = jmaWxEmoji(code);
+    if (tmEl) {
+      const mxS = tMax && tMax !== '' ? Math.round(parseFloat(tMax)) : '--';
+      const mnS = tMin && tMin !== '' ? Math.round(parseFloat(tMin)) : '--';
+      tmEl.textContent = `${mxS}°/${mnS}°`;
+    }
+  });
+}
+
+// ─── Screen navigation ────────────────────────────────────────────────────────
+function switchScreen(name, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ─── Google Calendar toggle ───────────────────────────────────────────────────
+function toggleGcal() {
+  const chip = document.getElementById('gcalChip');
+  const btn  = document.getElementById('gcalBtn');
+  const connected = btn.textContent === '解除する';
+  if (connected) {
+    chip.textContent = '未接続';
+    chip.className = 'chip chip-off';
+    btn.textContent = '接続する';
+    btn.className = 'btn btn-connect-sm';
+  } else {
+    chip.textContent = '接続済み';
+    chip.className = 'chip chip-on';
+    btn.textContent = '解除する';
+    btn.className = 'btn btn-disconnect';
+  }
+}
+
+// ─── Live clock ───────────────────────────────────────────────────────────────
+(function tick() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('sbTime').textContent = h + ':' + m;
+  setTimeout(tick, 15000);
+})();
+
+// ─── PWA: Notification data ───────────────────────────────────────────────────
+// Today's weather and schedule (2/21)
+let TODAY_RAIN_PROB = 0; // 降水確率（APIから更新）
+const TODAY_SCHEDULE  = [
+  { title: 'チームミーティング', time: '10:00' },
+  { title: 'クライアント訪問',   time: '14:00' },
+];
+const NOTIF_ASKED_KEY = 'notif_asked';
+
+// ─── Service Worker registration ──────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // When SW becomes active, schedule notification
+    if (reg.active) _doSchedule(reg.active);
+    reg.addEventListener('updatefound', () => {
+      reg.installing?.addEventListener('statechange', e => {
+        if (e.target.state === 'activated') _doSchedule(e.target);
+      });
+    });
+  }).catch(err => console.warn('[SW] failed:', err));
+
+  navigator.serviceWorker.ready.then(reg => {
+    if (reg.active) _doSchedule(reg.active);
+  });
+}
+
+// Also schedule via main-page setTimeout as fallback (works when app is open)
+(function mainPageSchedule() {
+  const now = new Date();
+  const target = new Date();
+  target.setHours(7, 0, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  const delay = target - now;
+
+  setTimeout(() => {
+    if (Notification.permission !== 'granted') return;
+    const notifRain     = localStorage.getItem('notif_rain')     !== 'false';
+    const notifSchedule = localStorage.getItem('notif_schedule') !== 'false';
+
+    if (notifRain && TODAY_RAIN_PROB >= 30) {
+      new Notification('今日の天気', {
+        body: `🌧 今日は雨の可能性があります（降水確率${TODAY_RAIN_PROB}%）。傘を忘れずに！`,
+        icon: './icon-192.svg',
+        tag: 'wx-rain-main',
+      });
+    }
+    if (notifSchedule && TODAY_SCHEDULE.length > 0) {
+      const ev = TODAY_SCHEDULE[0];
+      new Notification('今日の予定', {
+        body: `📅 今日の予定：${ev.title}${ev.time ? ' ' + ev.time : ''}`,
+        icon: './icon-192.svg',
+        tag: 'wx-schedule-main',
+      });
+    }
+    // Reschedule for next day
+    mainPageSchedule();
+  }, delay);
+})();
+
+// ─── Schedule notification via SW ─────────────────────────────────────────────
+function scheduleNotification() {
+  if (Notification.permission !== 'granted') return;
+  navigator.serviceWorker?.ready.then(reg => {
+    if (reg.active) _doSchedule(reg.active);
+  });
+}
+
+function _doSchedule(swController) {
+  if (Notification.permission !== 'granted') return;
+  const notifRain     = localStorage.getItem('notif_rain')     !== 'false';
+  const notifSchedule = localStorage.getItem('notif_schedule') !== 'false';
+  if (!notifRain && !notifSchedule) return;
+
+  const now = new Date();
+  const target = new Date();
+  target.setHours(7, 0, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  const delay = target - now;
+
+  swController.postMessage({
+    type: 'SCHEDULE_NOTIFICATION',
+    delay,
+    payload: {
+      rainProb: TODAY_RAIN_PROB,
+      schedule: TODAY_SCHEDULE,
+      notifRain,
+      notifSchedule,
+    },
+  });
+}
+
+// ─── Notification permission dialog ──────────────────────────────────────────
+function openNotifPermission() {
+  if (Notification.permission === 'granted') {
+    alert('通知は既に許可されています。');
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    alert('通知がブロックされています。\nブラウザの設定から「通知」を許可してください。');
+    return;
+  }
+  document.getElementById('notifOverlay').style.display = 'flex';
+}
+
+function requestNotifPermission() {
+  localStorage.setItem(NOTIF_ASKED_KEY, '1');
+  document.getElementById('notifOverlay').style.display = 'none';
+  Notification.requestPermission().then(perm => {
+    updateNotifBadge(perm);
+    if (perm === 'granted') scheduleNotification();
+  });
+}
+
+function dismissNotifDialog() {
+  localStorage.setItem(NOTIF_ASKED_KEY, 'dismissed');
+  document.getElementById('notifOverlay').style.display = 'none';
+}
+
+// ─── Notification toggle handler ──────────────────────────────────────────────
+function onToggle(el, key) {
+  el.classList.toggle('on');
+  localStorage.setItem(key, el.classList.contains('on') ? 'true' : 'false');
+
+  if (Notification.permission === 'granted') {
+    scheduleNotification();
+  } else if (el.classList.contains('on') && Notification.permission === 'default') {
+    // Offer permission if user turns on a toggle
+    document.getElementById('notifOverlay').style.display = 'flex';
+  }
+}
+
+// ─── Notification status badge ─────────────────────────────────────────────────
+function updateNotifBadge(perm) {
+  const badge = document.getElementById('notifBadge');
+  if (!badge) return;
+  if (perm === 'granted') {
+    badge.textContent = '許可済み';
+    badge.classList.add('granted');
+  } else if (perm === 'denied') {
+    badge.textContent = 'ブロック中';
+    badge.classList.remove('granted');
+  } else {
+    badge.textContent = '未許可';
+    badge.classList.remove('granted');
+  }
+}
+
+// ─── Init on load ─────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  // 設定を復元してから天気データ取得
+  loadWeatherSettings();
+  initWeather();
+
+  // Update notification badge
+  if ('Notification' in window) updateNotifBadge(Notification.permission);
+
+  // Restore toggle states from localStorage
+  ['schedule', 'rain', 'morning'].forEach(key => {
+    const el = document.getElementById(`toggle-${key}`);
+    if (!el) return;
+    if (localStorage.getItem(`notif_${key}`) === 'false') el.classList.remove('on');
+    else el.classList.add('on');
+  });
+
+  // Show permission dialog if not yet asked
+  if (!localStorage.getItem(NOTIF_ASKED_KEY)
+    && 'Notification' in window
+    && Notification.permission === 'default') {
+    setTimeout(() => {
+      document.getElementById('notifOverlay').style.display = 'flex';
+    }, 1800);
+  }
+});
+</script>
+</body>
+</html>

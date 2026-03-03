@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- Background -->
+  <rect width="192" height="192" rx="40" fill="#1565C0"/>
+  <!-- Sun body -->
+  <circle cx="90" cy="82" r="30" fill="#FDD835"/>
+  <!-- Sun rays -->
+  <g stroke="#FDD835" stroke-width="7" stroke-linecap="round">
+    <line x1="90" y1="36" x2="90" y2="24"/>
+    <line x1="90" y1="128" x2="90" y2="140"/>
+    <line x1="44" y1="82" x2="32" y2="82"/>
+    <line x1="136" y1="82" x2="148" y2="82"/>
+    <line x1="57.5" y1="49.5" x2="49" y2="41"/>
+    <line x1="122.5" y1="114.5" x2="131" y2="123"/>
+    <line x1="122.5" y1="49.5" x2="131" y2="41"/>
+    <line x1="57.5" y1="114.5" x2="49" y2="123"/>
+  </g>
+  <!-- Cloud -->
+  <ellipse cx="116" cy="112" rx="26" ry="18" fill="#fff"/>
+  <ellipse cx="104" cy="118" rx="20" ry="15" fill="#fff"/>
+  <ellipse cx="130" cy="118" rx="18" ry="14" fill="#fff"/>
+  <rect x="84" y="118" width="64" height="14" rx="0" fill="#fff"/>
+  <!-- Calendar lines -->
+  <rect x="34" y="152" width="124" height="6" rx="3" fill="rgba(255,255,255,0.7)"/>
+  <rect x="34" y="166" width="88" height="6" rx="3" fill="rgba(255,255,255,0.4)"/>
+</svg>
