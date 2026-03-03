@@ -1065,26 +1065,33 @@ async function fetchAMeDAS(lat, lon) {
   if (!m) return null;
   const base = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+09:00`);
 
-  // 最寄りの観測所を探索
-  let bestId = null, minD = Infinity;
+  // 距離順で近い局を最大 5 局取得
+  const candidates = [];
   for (const [id, st] of Object.entries(table)) {
     if (!st.lat || !st.lon) continue;
     const sLat = st.lat[0] + st.lat[1] / 60;
     const sLon = st.lon[0] + st.lon[1] / 60;
     const d = (lat - sLat) ** 2 + (lon - sLon) ** 2;
-    if (d < minD) { minD = d; bestId = id; }
+    candidates.push({ id, d });
   }
-  if (!bestId) return null;
+  candidates.sort((a, b) => a.d - b.d);
+  if (!candidates.length) return null;
 
-  // latest_time.txt の時刻でリクエスト。404 なら 10 分ずつ遡って最大 3 回リトライ
+  // 時刻キー候補を事前生成（latest_time 〜 30 分前、10 分刻み）
   const pad2 = n => String(n).padStart(2, '0');
+  const timeKeys = [];
   for (let backMin = 0; backMin <= 30; backMin += 10) {
     const t = new Date(base.getTime() - backMin * 60000);
-    // UTC → JST 変換してキー文字列を生成
     const jst = new Date(t.getTime() + 9 * 3600000);
-    const timeKey = `${jst.getUTCFullYear()}${pad2(jst.getUTCMonth()+1)}${pad2(jst.getUTCDate())}_${pad2(jst.getUTCHours())}${pad2(jst.getUTCMinutes())}${pad2(jst.getUTCSeconds())}`;
-    const res = await fetch(`${JMA_OBS}/data/point/${bestId}/${timeKey}.json`);
-    if (res.ok) return res.json();
+    timeKeys.push(`${jst.getUTCFullYear()}${pad2(jst.getUTCMonth()+1)}${pad2(jst.getUTCDate())}_${pad2(jst.getUTCHours())}${pad2(jst.getUTCMinutes())}${pad2(jst.getUTCSeconds())}`);
+  }
+
+  // 近い局から順に試し、全時刻 404 なら次の局へフォールバック
+  for (const { id } of candidates.slice(0, 5)) {
+    for (const timeKey of timeKeys) {
+      const res = await fetch(`${JMA_OBS}/data/point/${id}/${timeKey}.json`);
+      if (res.ok) return res.json();
+    }
   }
   return null;
 }
