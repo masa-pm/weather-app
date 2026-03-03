@@ -393,6 +393,16 @@ body{
   .phone::before { display: none; }
   .status-bar { display: none; }
 }
+
+  .cal-nav-btn {
+    background: none; border: none; color: white;
+    font-size: 28px; cursor: pointer; padding: 0 12px;
+    line-height: 1;
+  }
+  .cal-hdr { display: flex; align-items: center; justify-content: space-between; }
+  .cd.selected { background: rgba(255,255,255,0.4); border-radius: 50%; font-weight: bold; }
+  .cd.empty { pointer-events: none; }
+
 </style>
 </head>
 <body>
@@ -570,8 +580,12 @@ body{
   <!-- ═══════════ CALENDAR SCREEN ═══════════ -->
   <div class="screen" id="screen-calendar">
     <div class="cal-hdr">
-      <div class="cal-hdr-title">2026年 2月</div>
-      <div class="cal-hdr-sub">カレンダー</div>
+      <button class="cal-nav-btn" onclick="calChangeMonth(-1)">&#8249;</button>
+      <div>
+        <div class="cal-hdr-title" id="cal-hdr-title">2026年 3月</div>
+        <div class="cal-hdr-sub">カレンダー</div>
+      </div>
+      <button class="cal-nav-btn" onclick="calChangeMonth(1)">&#8250;</button>
     </div>
     <div class="cal-body">
       <div class="cal-grid-wrap">
@@ -581,85 +595,10 @@ body{
           <div class="cal-wd">木</div><div class="cal-wd">金</div>
           <div class="cal-wd">土</div>
         </div>
-        <div class="cal-days">
-          <!-- Feb 2026: starts Sunday -->
-          <div class="cd sun has-ev">1</div>
-          <div class="cd has-ev">2</div>
-          <div class="cd">3</div>
-          <div class="cd has-ev">4</div>
-          <div class="cd">5</div>
-          <div class="cd">6</div>
-          <div class="cd sat">7</div>
-
-          <div class="cd sun">8</div>
-          <div class="cd has-ev">9</div>
-          <div class="cd">10</div>
-          <div class="cd">11</div>
-          <div class="cd has-ev">12</div>
-          <div class="cd has-ev">13</div>
-          <div class="cd sat">14</div>
-
-          <div class="cd sun has-ev">15</div>
-          <div class="cd">16</div>
-          <div class="cd">17</div>
-          <div class="cd has-ev">18</div>
-          <div class="cd">19</div>
-          <div class="cd">20</div>
-          <div class="cd sat today has-ev">21</div>
-
-          <div class="cd sun has-ev">22</div>
-          <div class="cd has-ev">23</div>
-          <div class="cd has-ev">24</div>
-          <div class="cd has-ev">25</div>
-          <div class="cd has-ev">26</div>
-          <div class="cd has-ev">27</div>
-          <div class="cd sat">28</div>
+        <div class="cal-days" id="cal-days">
         </div>
       </div>
-      <div class="cal-ev-list">
-        <div class="cal-ev-ttl">📅 今日の予定 — 2/21（土）</div>
-        <div class="cal-ev-item">
-          <div class="cal-ev-dot dot-blue"></div>
-          <div class="cal-ev-info">
-            <div class="cal-ev-name">チームミーティング</div>
-            <div class="cal-ev-time">10:00 〜 11:00</div>
-          </div>
-          <span class="cal-ev-wx">☀️</span>
-        </div>
-        <div class="cal-ev-item">
-          <div class="cal-ev-dot dot-blue"></div>
-          <div class="cal-ev-info">
-            <div class="cal-ev-name">クライアント訪問</div>
-            <div class="cal-ev-time">14:00 〜 15:30</div>
-          </div>
-          <span class="cal-ev-wx">☀️</span>
-        </div>
-        <div class="cal-ev-ttl" style="margin-top:14px">📅 明日の予定 — 2/22（日）</div>
-        <div class="cal-ev-item">
-          <div class="cal-ev-dot dot-blue"></div>
-          <div class="cal-ev-info">
-            <div class="cal-ev-name">朝礼</div>
-            <div class="cal-ev-time">09:00 〜 09:30</div>
-          </div>
-          <span class="cal-ev-wx">⛅</span>
-        </div>
-        <div class="cal-ev-item">
-          <div class="cal-ev-dot dot-blue"></div>
-          <div class="cal-ev-info">
-            <div class="cal-ev-name">ランチMTG</div>
-            <div class="cal-ev-time">13:00 〜 14:00</div>
-          </div>
-          <span class="cal-ev-wx">⛅</span>
-        </div>
-        <div class="cal-ev-item">
-          <div class="cal-ev-dot dot-green"></div>
-          <div class="cal-ev-info">
-            <div class="cal-ev-name">社内研修（2/23）</div>
-            <div class="cal-ev-time">終日</div>
-          </div>
-          <span class="cal-ev-wx">🌧️</span>
-        </div>
-      </div>
+      <div class="cal-ev-list" id="cal-ev-list"></div>
     </div>
   </div><!-- /screen-calendar -->
 
@@ -1291,6 +1230,115 @@ async function gcalSync() {
     alert('同期中にエラーが発生しました: ' + e.message);
   }
 }
+
+// ─── Calendar rendering ──────────────────────────────────────────────────────
+const DAY_NAMES = ['日','月','火','水','木','金','土'];
+let calYear  = new Date().getFullYear();
+let calMonth = new Date().getMonth(); // 0-based
+let calSelectedDate = null; // "YYYY-MM-DD"
+
+function getSchedules() {
+  return JSON.parse(localStorage.getItem('schedules') || '[]');
+}
+
+function calDateKey(y, m, d) {
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function renderCalendar() {
+  const today = new Date();
+  const todayKey = calDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+  const schedules = getSchedules();
+
+  // ヘッダー更新
+  document.getElementById('cal-hdr-title').textContent =
+    `${calYear}年 ${calMonth+1}月`;
+
+  // 日付グリッド生成
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysEl = document.getElementById('cal-days');
+  daysEl.innerHTML = '';
+
+  // 空白セル
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cd empty';
+    daysEl.appendChild(el);
+  }
+
+  // 日付セル
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = calDateKey(calYear, calMonth, d);
+    const dow = (firstDay + d - 1) % 7;
+    const hasEv = schedules.some(s => s.date === key);
+    const el = document.createElement('div');
+    let cls = 'cd';
+    if (dow === 0) cls += ' sun';
+    if (dow === 6) cls += ' sat';
+    if (key === todayKey) cls += ' today';
+    if (key === calSelectedDate) cls += ' selected';
+    if (hasEv) cls += ' has-ev';
+    el.className = cls;
+    el.textContent = d;
+    el.addEventListener('click', () => {
+      calSelectedDate = key;
+      renderCalendar();
+    });
+    daysEl.appendChild(el);
+  }
+
+  // 選択日 or 今日のイベントリスト
+  const targetKey = calSelectedDate || todayKey;
+  renderEventList(targetKey);
+}
+
+function renderEventList(dateKey) {
+  const schedules = getSchedules();
+  const evList = document.getElementById('cal-ev-list');
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dow = new Date(y, m-1, d).getDay();
+  const label = `${m}/${d}（${DAY_NAMES[dow]}）`;
+
+  const dayEvs = schedules.filter(s => s.date === dateKey)
+    .sort((a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99'));
+
+  let html = `<div class="cal-ev-ttl">📅 ${label}の予定</div>`;
+  if (!dayEvs.length) {
+    html += `<div style="padding:16px;color:#aaa;text-align:center;">予定はありません</div>`;
+  } else {
+    dayEvs.forEach(ev => {
+      const timeStr = ev.allDay ? '終日' : ev.startTime + (ev.endTime ? ' 〜 ' + ev.endTime : '');
+      html += `
+        <div class="cal-ev-item">
+          <div class="cal-ev-dot dot-blue"></div>
+          <div class="cal-ev-info">
+            <div class="cal-ev-name">${ev.title}</div>
+            <div class="cal-ev-time">${timeStr}</div>
+          </div>
+        </div>`;
+    });
+  }
+  evList.innerHTML = html;
+}
+
+function calChangeMonth(delta) {
+  calMonth += delta;
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0;  calYear++; }
+  calSelectedDate = null;
+  renderCalendar();
+}
+
+// カレンダータブ切り替え時に描画
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    if (item.dataset.screen === 'calendar') renderCalendar();
+  });
+});
+
+// 初期描画
+renderCalendar();
 
 // ─── Live clock ───────────────────────────────────────────────────────────────
 (function tick() {
