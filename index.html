@@ -6,6 +6,7 @@
 <title>天気＆スケジュール</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async></script>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1565C0">
@@ -676,12 +677,20 @@ body{
           <div class="set-ico ico-b">📅</div>
           <div class="set-info">
             <div class="set-lbl">Googleカレンダー</div>
-            <div class="set-sub">user@gmail.com</div>
+            <div class="set-sub" id="gcalSubLbl">未接続</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            <span class="chip chip-on" id="gcalChip">接続済み</span>
-            <button class="btn btn-disconnect" id="gcalBtn" onclick="toggleGcal()">解除する</button>
+            <span class="chip chip-off" id="gcalChip">未接続</span>
+            <button class="btn btn-connect-sm" id="gcalBtn" onclick="toggleGcal()">接続する</button>
           </div>
+        </div>
+        <div class="set-row" id="gcalSyncRow" style="display:none">
+          <div class="set-ico ico-g">🔄</div>
+          <div class="set-info">
+            <div class="set-lbl">予定を同期する</div>
+            <div class="set-sub">今後30日分を取り込む</div>
+          </div>
+          <button class="btn btn-connect-sm" onclick="gcalSync()">同期</button>
         </div>
       </div>
 
@@ -1157,21 +1166,110 @@ function switchScreen(name, el) {
   el.classList.add('active');
 }
 
-// ─── Google Calendar toggle ───────────────────────────────────────────────────
+// ─── Google Calendar OAuth (GIS) ─────────────────────────────────────────────
+const GCAL_CLIENT_ID = '213170314680-85ltlp9ge8rln913mhvjarvs4upds9ae.apps.googleusercontent.com';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+let gcalToken = null;
+let gcalTokenClient = null;
+
 function toggleGcal() {
-  const chip = document.getElementById('gcalChip');
-  const btn  = document.getElementById('gcalBtn');
-  const connected = btn.textContent === '解除する';
-  if (connected) {
-    chip.textContent = '未接続';
-    chip.className = 'chip chip-off';
-    btn.textContent = '接続する';
-    btn.className = 'btn btn-connect-sm';
+  if (gcalToken) {
+    gcalSignOut();
   } else {
+    gcalSignIn();
+  }
+}
+
+function gcalSignIn() {
+  if (!window.google?.accounts?.oauth2) {
+    alert('Google Identity Services の読み込み中です。しばらくしてから再試行してください。');
+    return;
+  }
+  if (!gcalTokenClient) {
+    gcalTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID,
+      scope: GCAL_SCOPE,
+      callback: onGcalToken,
+    });
+  }
+  gcalTokenClient.requestAccessToken();
+}
+
+function onGcalToken(resp) {
+  if (resp.error) {
+    alert('Googleサインインに失敗しました: ' + resp.error);
+    return;
+  }
+  gcalToken = resp.access_token;
+  renderGcalUI(true);
+  gcalSync();
+}
+
+function gcalSignOut() {
+  if (gcalToken) google.accounts.oauth2.revoke(gcalToken, () => {});
+  gcalToken = null;
+  gcalTokenClient = null;
+  renderGcalUI(false);
+}
+
+function renderGcalUI(connected) {
+  const chip    = document.getElementById('gcalChip');
+  const btn     = document.getElementById('gcalBtn');
+  const sub     = document.getElementById('gcalSubLbl');
+  const syncRow = document.getElementById('gcalSyncRow');
+  if (connected) {
     chip.textContent = '接続済み';
-    chip.className = 'chip chip-on';
-    btn.textContent = '解除する';
-    btn.className = 'btn btn-disconnect';
+    chip.className   = 'chip chip-on';
+    btn.textContent  = '解除する';
+    btn.className    = 'btn btn-disconnect';
+    sub.textContent  = 'Googleカレンダーと接続中';
+    syncRow.style.display = '';
+  } else {
+    chip.textContent = '未接続';
+    chip.className   = 'chip chip-off';
+    btn.textContent  = '接続する';
+    btn.className    = 'btn btn-connect-sm';
+    sub.textContent  = '未接続';
+    syncRow.style.display = 'none';
+  }
+}
+
+async function gcalSync() {
+  if (!gcalToken) { alert('先にGoogleカレンダーを接続してください。'); return; }
+  const now = new Date();
+  const timeMin = now.toISOString();
+  const timeMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30).toISOString();
+  const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?' +
+    'timeMin=' + encodeURIComponent(timeMin) +
+    '&timeMax=' + encodeURIComponent(timeMax) +
+    '&singleEvents=true&orderBy=startTime&maxResults=250';
+  try {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + gcalToken } });
+    if (res.status === 401) { gcalSignOut(); alert('認証が切れました。再接続してください。'); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const items = data.items || [];
+    if (!items.length) { alert('今後30日間に予定がありません。'); return; }
+    if (!confirm('Googleカレンダーから ' + items.length + ' 件の予定を取り込みますか？')) return;
+    const stored = JSON.parse(localStorage.getItem('schedules') || '[]');
+    items.forEach(item => {
+      const start = item.start?.dateTime || item.start?.date || '';
+      const end   = item.end?.dateTime   || item.end?.date   || '';
+      const isAllDay = !item.start?.dateTime;
+      stored.push({
+        id:        Date.now() + Math.random(),
+        title:     item.summary || '(無題)',
+        date:      start.substring(0, 10),
+        startTime: isAllDay ? '' : start.substring(11, 16),
+        endTime:   isAllDay ? '' : end.substring(11, 16),
+        allDay:    isAllDay,
+        memo:      item.description || '',
+      });
+    });
+    localStorage.setItem('schedules', JSON.stringify(stored));
+    alert(items.length + ' 件を取り込みました！');
+  } catch (e) {
+    alert('同期中にエラーが発生しました: ' + e.message);
   }
 }
 
