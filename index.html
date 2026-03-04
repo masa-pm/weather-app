@@ -560,28 +560,20 @@ body{
           <span class="notif-status-badge" id="notifBadge">未許可</span>
         </div>
         <div class="set-row">
-          <div class="set-ico ico-p">🔔</div>
-          <div class="set-info">
-            <div class="set-lbl">予定リマインダー</div>
-            <div class="set-sub">毎朝7:00に当日の予定をお知らせ</div>
-          </div>
-          <div class="toggle on" id="toggle-schedule" onclick="onToggle(this,'notif_schedule')"></div>
-        </div>
-        <div class="set-row">
-          <div class="set-ico ico-b">🌧️</div>
-          <div class="set-info">
-            <div class="set-lbl">雨の通知</div>
-            <div class="set-sub">降水確率30%以上の日にお知らせ</div>
-          </div>
-          <div class="toggle on" id="toggle-rain" onclick="onToggle(this,'notif_rain')"></div>
-        </div>
-        <div class="set-row">
           <div class="set-ico ico-o">🌅</div>
           <div class="set-info">
-            <div class="set-lbl">朝の天気まとめ</div>
-            <div class="set-sub">毎朝7:00に天気＋予定をまとめて</div>
+            <div class="set-lbl">朝のまとめ</div>
+            <div class="set-sub">毎朝7:00に天気＋予定をお知らせ</div>
           </div>
           <div class="toggle on" id="toggle-morning" onclick="onToggle(this,'notif_morning')"></div>
+        </div>
+        <div class="set-row">
+          <div class="set-ico ico-b">☂️</div>
+          <div class="set-info">
+            <div class="set-lbl">雨の通知</div>
+            <div class="set-sub">降水確率30%以上の日に傘を通知</div>
+          </div>
+          <div class="toggle on" id="toggle-rain" onclick="onToggle(this,'notif_rain')"></div>
         </div>
         <div class="set-row" style="justify-content:center">
           <button class="btn btn-connect-sm" onclick="openNotifPermission()" style="width:100%;padding:11px;font-size:13px">
@@ -935,6 +927,7 @@ function applyForecastHeader(fc) {
   const desc = (wxArea?.weathers?.[0] || '').replace(/　/g, '');
   if (code) document.getElementById('wx-emoji').textContent = jmaWxEmoji(code);
   document.getElementById('wx-desc-text').textContent = desc || '--';
+  wxDescCache = desc || '';
 
   // 今日の降水確率（6時間スロットの最大値）
   const todayKey = jstDateKey(new Date());
@@ -959,8 +952,11 @@ function applyForecastHeader(fc) {
 
 // AMeDAS 実況値（気温・湿度・風速）を上書き反映
 function applyObservations(obs) {
-  if (Array.isArray(obs.temp) && obs.temp[1] === 0)
-    document.getElementById('wx-temp-val').textContent = Math.round(obs.temp[0]);
+  if (Array.isArray(obs.temp) && obs.temp[1] === 0) {
+    const t = Math.round(obs.temp[0]);
+    document.getElementById('wx-temp-val').textContent = t;
+    tempCache = t;
+  }
   document.getElementById('wx-humidity-val').textContent =
     Array.isArray(obs.humidity) && obs.humidity[1] === 0
       ? Math.round(obs.humidity[0]) + '%' : '--';
@@ -1304,6 +1300,19 @@ function renderHomeSchedule() {
   container.innerHTML = html;
 }
 
+// ─── 6:50 天気自動更新 ───────────────────────────────────────────────────────
+(function scheduleWeatherRefresh() {
+  const now = new Date();
+  const target = new Date();
+  target.setHours(6, 50, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  const delay = target - now;
+  setTimeout(() => {
+    initWeather();
+    scheduleWeatherRefresh();
+  }, delay);
+})();
+
 // ─── Live clock ───────────────────────────────────────────────────────────────
 (function tick() {
   const now = new Date();
@@ -1316,6 +1325,8 @@ function renderHomeSchedule() {
 // ─── PWA: Notification data ───────────────────────────────────────────────────
 // Today's weather and schedule (2/21)
 let TODAY_RAIN_PROB = 0; // 降水確率（APIから更新）
+let wxDescCache = ''; // 天気説明キャッシュ
+let tempCache   = ''; // 気温キャッシュ
 
 function getTodaySchedule() {
   const today = new Date();
@@ -1357,20 +1368,25 @@ if ('serviceWorker' in navigator) {
     const notifRain     = localStorage.getItem('notif_rain')     !== 'false';
     const notifSchedule = localStorage.getItem('notif_schedule') !== 'false';
 
-    if (notifRain && TODAY_RAIN_PROB >= 30) {
-      new Notification('今日の天気', {
-        body: `🌧 今日は雨の可能性があります（降水確率${TODAY_RAIN_PROB}%）。傘を忘れずに！`,
+    const notifMorning = localStorage.getItem('notif_morning') !== 'false';
+    // 朝のまとめ通知
+    if (notifMorning) {
+      const todayEvs = getTodaySchedule();
+      const evText = todayEvs.length > 0
+        ? '\n📅 ' + todayEvs.slice(0, 3).map(e => `${e.time ? e.time + ' ' : ''}${e.title}`).join('、')
+        : '\n📅 今日の予定はありません';
+      new Notification('🌅 今日の天気', {
+        body: `${wxDescCache || '--'}　${tempCache || '--'}°C${evText}`,
         icon: './icon-192.svg',
-        tag: 'wx-rain-main',
+        tag: 'wx-morning-main',
       });
     }
-    const todayEvs = getTodaySchedule();
-    if (notifSchedule && todayEvs.length > 0) {
-      const evList = todayEvs.slice(0, 3).map(e => `${e.time ? e.time + ' ' : ''}${e.title}`).join('、');
-      new Notification('今日の予定', {
-        body: `📅 ${evList}`,
+    // 雨の通知（別通知）
+    if (notifRain && TODAY_RAIN_PROB >= 30) {
+      new Notification('☂️ 今日は雨の可能性があります', {
+        body: `降水確率${TODAY_RAIN_PROB}%。傘をお忘れなく！`,
         icon: './icon-192.svg',
-        tag: 'wx-schedule-main',
+        tag: 'wx-rain-main',
       });
     }
     // Reschedule for next day
@@ -1388,9 +1404,9 @@ function scheduleNotification() {
 
 function _doSchedule(swController) {
   if (Notification.permission !== 'granted') return;
-  const notifRain     = localStorage.getItem('notif_rain')     !== 'false';
-  const notifSchedule = localStorage.getItem('notif_schedule') !== 'false';
-  if (!notifRain && !notifSchedule) return;
+  const notifRain    = localStorage.getItem('notif_rain')    !== 'false';
+  const notifMorning = localStorage.getItem('notif_morning') !== 'false';
+  if (!notifRain && !notifMorning) return;
 
   const now = new Date();
   const target = new Date();
