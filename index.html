@@ -942,12 +942,15 @@ function applyForecastHeader(fc) {
   document.getElementById('wx-rain-val').textContent = maxPop + '%';
   TODAY_RAIN_PROB = maxPop;
 
-  // 今日の最高・最低気温（予報値 — AMeDAS で後から上書き）
-  const tMax = tmpArea?.tempsMax?.[0];
-  const tMin = tmpArea?.tempsMin?.[0];
+  // 今日の最高・最低気温（timeDefinesで今日のインデックスを検索）
+  const tmpTs2  = ts[2];
+  const tmpArea2 = tmpTs2?.areas?.[0];
+  const todayKey2 = jstDateKey(new Date());
+  const tIdx = tmpTs2?.timeDefines?.findIndex(td => td.startsWith(todayKey2)) ?? 0;
+  const tMax = tmpArea2?.tempsMax?.[tIdx];
+  const tMin = tmpArea2?.tempsMin?.[tIdx];
   const maxStr = tMax && tMax !== '' ? Math.round(parseFloat(tMax)) : '--';
   const minStr = tMin && tMin !== '' ? Math.round(parseFloat(tMin)) : '--';
-  document.getElementById('wx-temp-val').textContent = maxStr;
   document.getElementById('wx-range-text').textContent = `最高 ${maxStr}° / 最低 ${minStr}°`;
 }
 
