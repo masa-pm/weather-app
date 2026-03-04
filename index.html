@@ -505,6 +505,7 @@ body{
           <div class="set-info">
             <div class="set-lbl">Googleカレンダー</div>
             <div class="set-sub" id="gcalSubLbl">未接続</div>
+            <div class="set-sub" id="gcalAccountLbl" style="font-size:11px;color:#888;display:none"></div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
             <span class="chip chip-off" id="gcalChip">未接続</span>
@@ -541,17 +542,7 @@ body{
           <input class="set-input" id="input-location" type="text"
                  value="渋谷区, 東京都" disabled style="opacity:0.45">
         </div>
-        <div class="set-row">
-          <div class="set-ico ico-t">🌡️</div>
-          <div class="set-info">
-            <div class="set-lbl">温度単位</div>
-            <div class="set-sub">摂氏 / 華氏</div>
-          </div>
-          <select class="set-select">
-            <option>°C（摂氏）</option>
-            <option>°F（華氏）</option>
-          </select>
-        </div>
+
       </div>
 
       <!-- Notifications -->
@@ -1065,10 +1056,11 @@ function gcalSignOut() {
 }
 
 function renderGcalUI(connected) {
-  const chip    = document.getElementById('gcalChip');
-  const btn     = document.getElementById('gcalBtn');
-  const sub     = document.getElementById('gcalSubLbl');
-  const syncRow = document.getElementById('gcalSyncRow');
+  const chip       = document.getElementById('gcalChip');
+  const btn        = document.getElementById('gcalBtn');
+  const sub        = document.getElementById('gcalSubLbl');
+  const accountLbl = document.getElementById('gcalAccountLbl');
+  const syncRow    = document.getElementById('gcalSyncRow');
   if (connected) {
     chip.textContent = '接続済み';
     chip.className   = 'chip chip-on';
@@ -1076,12 +1068,24 @@ function renderGcalUI(connected) {
     btn.className    = 'btn btn-disconnect';
     sub.textContent  = 'Googleカレンダーと接続中';
     syncRow.style.display = '';
+    // アカウント名を取得して表示
+    if (gcalToken) {
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: 'Bearer ' + gcalToken }
+      }).then(r => r.json()).then(info => {
+        if (info.name || info.email) {
+          accountLbl.textContent = info.name || info.email;
+          accountLbl.style.display = '';
+        }
+      }).catch(() => {});
+    }
   } else {
     chip.textContent = '未接続';
     chip.className   = 'chip chip-off';
     btn.textContent  = '接続する';
     btn.className    = 'btn btn-connect-sm';
     sub.textContent  = '未接続';
+    if (accountLbl) { accountLbl.textContent = ''; accountLbl.style.display = 'none'; }
     syncRow.style.display = 'none';
   }
 }
