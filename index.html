@@ -946,9 +946,11 @@ function applyForecastHeader(fc) {
   const tmpTs2   = ts[2];
   const tmpArea2 = tmpTs2?.areas?.[0];
   const temps    = tmpArea2?.temps || [];
-  // temps: [今日最低(00:00), 今日最高(09:00), 明日最低, 明日最高] の順
-  const tMax = temps[1] && temps[1] !== '' ? Math.round(parseFloat(temps[1])) : '--';
-  const tMin = temps[0] && temps[0] !== '' ? Math.round(parseFloat(temps[0])) : '--';
+  // temps[0]=今日09:00(最高), temps[1]=今日00:00(最低)
+  // 最高と最低が同じ値の場合は最低を--とする
+  const tMax = temps[0] && temps[0] !== '' ? Math.round(parseFloat(temps[0])) : '--';
+  const tMinRaw = temps[1] && temps[1] !== '' ? Math.round(parseFloat(temps[1])) : '--';
+  const tMin = tMinRaw !== '--' && tMinRaw !== tMax ? tMinRaw : '--';
   document.getElementById('wx-range-text').textContent = `最高 ${tMax}° / 最低 ${tMin}°`;
 }
 
@@ -976,8 +978,9 @@ function applyForecastCards(fc) {
 
   // 今日のtemps（fc[0] timeSeries[2]）
   const todayTemps = fc[0]?.timeSeries?.[2]?.areas?.[0]?.temps || [];
-  const todayTMax = todayTemps[1] && todayTemps[1] !== '' ? Math.round(parseFloat(todayTemps[1])) : '--';
-  const todayTMin = todayTemps[0] && todayTemps[0] !== '' ? Math.round(parseFloat(todayTemps[0])) : '--';
+  const todayTMax = todayTemps[0] && todayTemps[0] !== '' ? Math.round(parseFloat(todayTemps[0])) : '--';
+  const todayTMinRaw = todayTemps[1] && todayTemps[1] !== '' ? Math.round(parseFloat(todayTemps[1])) : '--';
+  const todayTMin = todayTMinRaw !== '--' && todayTMinRaw !== todayTMax ? todayTMinRaw : '--';
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
