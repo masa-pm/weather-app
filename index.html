@@ -437,6 +437,7 @@ body{
           <div class="wx-temp"><span id="wx-temp-val">--</span><sup>°C</sup></div>
           <div class="wx-desc" id="wx-desc-text">--</div>
           <div class="wx-range" id="wx-range-text">最高 --° / 最低 --°</div>
+          <a href="https://nerv.app" target="_blank" style="display:inline-block;margin-top:6px;font-size:11px;color:rgba(255,255,255,0.8);text-decoration:none;background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:12px;">🌧 雨雲レーダー</a>
         </div>
       </div>
       <div class="wx-stats">
@@ -476,8 +477,8 @@ body{
         <div class="cal-hdr-title" id="cal-hdr-title">2026年 3月</div>
   
       </div>
+      <button class="cal-nav-btn" onclick="gcalSync();renderCalendar();" style="font-size:18px;margin-left:8px">&#x21bb;</button>
       <button class="cal-nav-btn cal-nav-btn-next" onclick="calChangeMonth(1)">&#8250;</button>
-      <button class="cal-nav-btn" onclick="gcalSync();renderCalendar();" style="font-size:18px">&#x21bb;</button>
     </div>
     <div class="cal-body">
       <div class="cal-grid-wrap">
@@ -934,10 +935,10 @@ function applyForecastHeader(fc) {
   const tmpTs2   = ts[2];
   const tmpArea2 = tmpTs2?.areas?.[0];
   const temps    = tmpArea2?.temps || [];
-  // temps[0]=今日09:00(最高), temps[1]=今日00:00(最低)
+  // temps[0]=今日00:00(最低), temps[1]=今日09:00(最高)
   // 最高と最低が同じ値の場合は最低を--とする
-  const tMax = temps[0] && temps[0] !== '' ? Math.round(parseFloat(temps[0])) : '--';
-  const tMinRaw = temps[1] && temps[1] !== '' ? Math.round(parseFloat(temps[1])) : '--';
+  const tMax = temps[1] && temps[1] !== '' ? Math.round(parseFloat(temps[1])) : '--';
+  const tMinRaw = temps[0] && temps[0] !== '' ? Math.round(parseFloat(temps[0])) : '--';
   const tMin = tMinRaw !== '--' && tMinRaw !== tMax ? tMinRaw : '--';
   document.getElementById('wx-range-text').textContent = `最高 ${tMax}° / 最低 ${tMin}°`;
 }
@@ -1089,7 +1090,8 @@ function renderGcalUI(connected) {
 async function gcalSync() {
   if (!gcalToken) { alert('先にGoogleカレンダーを接続してください。'); return; }
   const now = new Date();
-  const timeMin = now.toISOString();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const timeMin = todayStart.toISOString();
   const timeMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30).toISOString();
   const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?' +
     'timeMin=' + encodeURIComponent(timeMin) +
