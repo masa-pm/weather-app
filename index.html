@@ -1316,10 +1316,15 @@ function renderHomeSchedule() {
 // ─── PWA: Notification data ───────────────────────────────────────────────────
 // Today's weather and schedule (2/21)
 let TODAY_RAIN_PROB = 0; // 降水確率（APIから更新）
-const TODAY_SCHEDULE  = [
-  { title: 'チームミーティング', time: '10:00' },
-  { title: 'クライアント訪問',   time: '14:00' },
-];
+
+function getTodaySchedule() {
+  const today = new Date();
+  const key = calDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+  return getSchedules()
+    .filter(s => s.date === key)
+    .sort((a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99'))
+    .map(s => ({ title: s.title, time: s.startTime || '' }));
+}
 const NOTIF_ASKED_KEY = 'notif_asked';
 
 // ─── Service Worker registration ──────────────────────────────────────────────
@@ -1359,10 +1364,11 @@ if ('serviceWorker' in navigator) {
         tag: 'wx-rain-main',
       });
     }
-    if (notifSchedule && TODAY_SCHEDULE.length > 0) {
-      const ev = TODAY_SCHEDULE[0];
+    const todayEvs = getTodaySchedule();
+    if (notifSchedule && todayEvs.length > 0) {
+      const evList = todayEvs.slice(0, 3).map(e => `${e.time ? e.time + ' ' : ''}${e.title}`).join('、');
       new Notification('今日の予定', {
-        body: `📅 今日の予定：${ev.title}${ev.time ? ' ' + ev.time : ''}`,
+        body: `📅 ${evList}`,
         icon: './icon-192.svg',
         tag: 'wx-schedule-main',
       });
@@ -1397,7 +1403,7 @@ function _doSchedule(swController) {
     delay,
     payload: {
       rainProb: TODAY_RAIN_PROB,
-      schedule: TODAY_SCHEDULE,
+      schedule: getTodaySchedule(),
       notifRain,
       notifSchedule,
     },
