@@ -946,9 +946,9 @@ function applyForecastHeader(fc) {
   const tmpTs2   = ts[2];
   const tmpArea2 = tmpTs2?.areas?.[0];
   const temps    = tmpArea2?.temps || [];
-  // temps: [今日最高(09:00), 今日最低(00:00), 明日最低, 明日最高] の順
-  const tMax = temps[0] && temps[0] !== '' ? Math.round(parseFloat(temps[0])) : '--';
-  const tMin = temps[1] && temps[1] !== '' ? Math.round(parseFloat(temps[1])) : '--';
+  // temps: [今日最低(00:00), 今日最高(09:00), 明日最低, 明日最高] の順
+  const tMax = temps[1] && temps[1] !== '' ? Math.round(parseFloat(temps[1])) : '--';
+  const tMin = temps[0] && temps[0] !== '' ? Math.round(parseFloat(temps[0])) : '--';
   document.getElementById('wx-range-text').textContent = `最高 ${tMax}° / 最低 ${tMin}°`;
 }
 
@@ -971,8 +971,13 @@ function applyObservations(obs) {
 function applyForecastCards(fc) {
   const wk    = fc[1]?.timeSeries || [];
   const wxTs  = wk[0];   // 天気コード + 降水確率
-  const tmpTs = wk[1];   // 最高/最低気温
+  const tmpTs = wk[1];   // 最高/最低気温（明日以降）
   if (!wxTs) return;
+
+  // 今日のtemps（fc[0] timeSeries[2]）
+  const todayTemps = fc[0]?.timeSeries?.[2]?.areas?.[0]?.temps || [];
+  const todayTMax = todayTemps[1] && todayTemps[1] !== '' ? Math.round(parseFloat(todayTemps[1])) : '--';
+  const todayTMin = todayTemps[0] && todayTemps[0] !== '' ? Math.round(parseFloat(todayTemps[0])) : '--';
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
@@ -981,22 +986,23 @@ function applyForecastCards(fc) {
     const target    = new Date(today); target.setDate(today.getDate() + offset);
     const targetKey = jstDateKey(target);
 
-    const idx = wxTs.timeDefines?.findIndex(td => td.startsWith(targetKey));
-    if (idx < 0) return;
+    const wxArea = wxTs.areas?.[0];
+    const wxEl   = card.querySelector('.dc-wx');
+    const tmEl   = card.querySelector('.dc-temps');
 
-    const wxArea  = wxTs.areas?.[0];
-    const tmpArea = tmpTs?.areas?.[0];
-    const code    = wxArea?.weatherCodes?.[idx];
-    const tMax    = tmpArea?.tempsMax?.[idx];
-    const tMin    = tmpArea?.tempsMin?.[idx];
+    const wxIdx = wxTs.timeDefines?.findIndex(td => td.startsWith(targetKey));
+    if (wxIdx >= 0 && wxEl) wxEl.textContent = jmaWxEmoji(wxArea?.weatherCodes?.[wxIdx]);
 
-    const wxEl = card.querySelector('.dc-wx');
-    const tmEl = card.querySelector('.dc-temps');
-    if (wxEl && code) wxEl.textContent = jmaWxEmoji(code);
     if (tmEl) {
-      const mxS = tMax && tMax !== '' ? Math.round(parseFloat(tMax)) : '--';
-      const mnS = tMin && tMin !== '' ? Math.round(parseFloat(tMin)) : '--';
-      tmEl.textContent = `${mxS}°/${mnS}°`;
+      if (offset === 0) {
+        tmEl.textContent = `${todayTMax}°/${todayTMin}°`;
+      } else {
+        const tmpArea = tmpTs?.areas?.[0];
+        const tIdx = tmpTs?.timeDefines?.findIndex(td => td.startsWith(targetKey)) ?? -1;
+        const tMax = tIdx >= 0 && tmpArea?.tempsMax?.[tIdx] !== '' ? Math.round(parseFloat(tmpArea?.tempsMax?.[tIdx])) : '--';
+        const tMin = tIdx >= 0 && tmpArea?.tempsMin?.[tIdx] !== '' ? Math.round(parseFloat(tmpArea?.tempsMin?.[tIdx])) : '--';
+        tmEl.textContent = `${tMax}°/${tMin}°`;
+      }
     }
   });
 }
