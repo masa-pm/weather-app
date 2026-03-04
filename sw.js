@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'wx-app-v4';
+const CACHE_NAME = 'wx-app-v5';
 const PRECACHE = [
   './',
   './index.html',
