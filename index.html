@@ -1011,7 +1011,7 @@ function switchScreen(name, el) {
 
 // ─── Google Calendar OAuth (GIS) ─────────────────────────────────────────────
 const GCAL_CLIENT_ID = '213170314680-85ltlp9ge8rln913mhvjarvs4upds9ae.apps.googleusercontent.com';
-const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.profile';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 let gcalToken = null;
 let gcalTokenClient = null;
 
@@ -1068,13 +1068,13 @@ function renderGcalUI(connected) {
     btn.className    = 'btn btn-disconnect';
     sub.textContent  = 'Googleカレンダーと接続中';
     syncRow.style.display = '';
-    // アカウント名を取得して表示
+    // カレンダー情報からメールアドレスを取得して表示
     if (gcalToken) {
-      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList/primary', {
         headers: { Authorization: 'Bearer ' + gcalToken }
       }).then(r => r.json()).then(info => {
-        if (info.name || info.email) {
-          accountLbl.textContent = info.name || info.email;
+        if (info.id) {
+          accountLbl.textContent = info.id;
           accountLbl.style.display = '';
         }
       }).catch(() => {});
