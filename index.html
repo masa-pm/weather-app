@@ -460,120 +460,7 @@ body{
     <!-- Schedule Scroll Area -->
     <div class="sch-area">
       <div class="sch-ttl">📅 今週の予定</div>
-
-      <!-- Today -->
-      <div class="day-card today" data-day-offset="0">
-        <div class="dc-hdr">
-          <div class="dc-left">
-            <span class="dc-day">今日</span>
-            <span class="today-chip">TODAY</span>
-            <span class="dc-date">2/21 土</span>
-          </div>
-          <div class="dc-right">
-            <span class="dc-wx">☀️</span>
-            <span class="dc-temps">27°/16°</span>
-          </div>
-        </div>
-        <div class="ev-list">
-          <div class="ev timed">
-            <span class="ev-time">10:00</span>
-            <span class="ev-title">チームミーティング</span>
-          </div>
-          <div class="ev timed">
-            <span class="ev-time">14:00</span>
-            <span class="ev-title">クライアント訪問</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 翌日予定なし → カード非表示 -->
-
-      <!-- +2日 -->
-      <div class="day-card" data-day-offset="2">
-        <div class="dc-hdr">
-          <div class="dc-left">
-            <span class="dc-day">明後日</span>
-            <span class="dc-date">2/23 月</span>
-          </div>
-          <div class="dc-right">
-            <span class="dc-wx">🌧️</span>
-            <span class="dc-temps">18°/13°</span>
-          </div>
-        </div>
-        <div class="ev-list">
-          <div class="ev allday">
-            <span class="ev-time">終日</span>
-            <span class="ev-title">社内研修</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- +3日 -->
-      <div class="day-card" data-day-offset="3">
-        <div class="dc-hdr">
-          <div class="dc-left">
-            <span class="dc-day">火曜日</span>
-            <span class="dc-date">2/24 火</span>
-          </div>
-          <div class="dc-right">
-            <span class="dc-wx">☀️</span>
-            <span class="dc-temps">21°/14°</span>
-          </div>
-        </div>
-        <div class="ev-list">
-          <div class="ev timed">
-            <span class="ev-time">15:00</span>
-            <span class="ev-title">部門会議</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- +4日 -->
-      <div class="day-card" data-day-offset="4">
-        <div class="dc-hdr">
-          <div class="dc-left">
-            <span class="dc-day">水曜日</span>
-            <span class="dc-date">2/25 水</span>
-          </div>
-          <div class="dc-right">
-            <span class="dc-wx">⛅</span>
-            <span class="dc-temps">20°/13°</span>
-          </div>
-        </div>
-        <div class="ev-list">
-          <div class="ev timed">
-            <span class="ev-time">12:00</span>
-            <span class="ev-title">ランチ会</span>
-          </div>
-          <div class="ev timed">
-            <span class="ev-time">18:00</span>
-            <span class="ev-title">社内懇親会</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- +5日予定なし → カード非表示 -->
-
-      <!-- +6日 -->
-      <div class="day-card" data-day-offset="6">
-        <div class="dc-hdr">
-          <div class="dc-left">
-            <span class="dc-day">金曜日</span>
-            <span class="dc-date">2/27 金</span>
-          </div>
-          <div class="dc-right">
-            <span class="dc-wx">🌧️</span>
-            <span class="dc-temps">17°/12°</span>
-          </div>
-        </div>
-        <div class="ev-list">
-          <div class="ev allday">
-            <span class="ev-time">終日</span>
-            <span class="ev-title">有給休暇</span>
-          </div>
-        </div>
-      </div>
-
+      <div id="home-day-cards"></div>
     </div><!-- /sch-area -->
   </div><!-- /screen-home -->
 
@@ -1230,6 +1117,7 @@ async function gcalSync() {
     const manual = stored.filter(s => s.source !== 'gcal');
     localStorage.setItem('schedules', JSON.stringify([...manual, ...gcalItems]));
     renderCalendar();
+    renderHomeSchedule();
     alert(items.length + ' 件を取り込みました！');
   } catch (e) {
     alert('同期中にエラーが発生しました: ' + e.message);
@@ -1361,6 +1249,60 @@ document.querySelectorAll('.nav-item').forEach(item => {
 
 // 初期描画
 renderCalendar();
+renderHomeSchedule();
+
+// ─── Home schedule rendering ─────────────────────────────────────────────────
+function renderHomeSchedule() {
+  const container = document.getElementById('home-day-cards');
+  if (!container) return;
+  const schedules = getSchedules();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayNames = ['日','月','火','水','木','金','土'];
+  let html = '';
+
+  for (let offset = 0; offset <= 6; offset++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + offset);
+    const key = calDateKey(d.getFullYear(), d.getMonth(), d.getDate());
+    const dayEvs = schedules.filter(s => s.date === key)
+      .sort((a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99'));
+
+    if (!dayEvs.length) continue; // 予定のない日はスキップ
+
+    const dayLabel = offset === 0 ? '今日' : offset === 1 ? '明日' : offset === 2 ? '明後日' : `${dayNames[d.getDay()]}曜日`;
+    const dateStr  = `${d.getMonth()+1}/${d.getDate()} ${dayNames[d.getDay()]}`;
+    const isToday  = offset === 0;
+
+    let evHtml = '';
+    dayEvs.forEach(ev => {
+      const timeStr = ev.allDay ? '終日' : ev.startTime;
+      const cls = ev.allDay ? 'ev allday' : 'ev timed';
+      evHtml += `<div class="${cls}"><span class="ev-time">${timeStr}</span><span class="ev-title">${ev.title}</span></div>`;
+    });
+
+    html += `
+      <div class="day-card${isToday ? ' today' : ''}" data-day-offset="${offset}">
+        <div class="dc-hdr">
+          <div class="dc-left">
+            <span class="dc-day">${dayLabel}</span>
+            ${isToday ? '<span class="today-chip">TODAY</span>' : ''}
+            <span class="dc-date">${dateStr}</span>
+          </div>
+          <div class="dc-right">
+            <span class="dc-wx"></span>
+            <span class="dc-temps">--°/--°</span>
+          </div>
+        </div>
+        <div class="ev-list">${evHtml}</div>
+      </div>`;
+  }
+
+  if (!html) {
+    html = '<div style="padding:16px;color:#aaa;text-align:center;">今週の予定はありません</div>';
+  }
+  container.innerHTML = html;
+}
 
 // ─── Live clock ───────────────────────────────────────────────────────────────
 (function tick() {
