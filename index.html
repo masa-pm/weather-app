@@ -1057,14 +1057,13 @@ function renderGcalUI(connected) {
   const btn        = document.getElementById('gcalBtn');
   const sub        = document.getElementById('gcalSubLbl');
   const accountLbl = document.getElementById('gcalAccountLbl');
-  const syncRow    = document.getElementById('gcalSyncRow');
+
   if (connected) {
     chip.textContent = '接続済み';
     chip.className   = 'chip chip-on';
     btn.textContent  = '解除する';
     btn.className    = 'btn btn-disconnect';
-    sub.textContent  = 'Googleカレンダーと接続中';
-    syncRow.style.display = '';
+    sub.textContent  = '';
     // カレンダー情報からメールアドレスを取得して表示
     if (gcalToken) {
       fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList/primary', {
@@ -1083,7 +1082,7 @@ function renderGcalUI(connected) {
     btn.className    = 'btn btn-connect-sm';
     sub.textContent  = '未接続';
     if (accountLbl) { accountLbl.textContent = ''; accountLbl.style.display = 'none'; }
-    syncRow.style.display = 'none';
+
   }
 }
 
