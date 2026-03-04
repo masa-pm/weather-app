@@ -942,17 +942,14 @@ function applyForecastHeader(fc) {
   document.getElementById('wx-rain-val').textContent = maxPop + '%';
   TODAY_RAIN_PROB = maxPop;
 
-  // 今日の最高・最低気温（fc[0] timeSeries[2]から今日の00:00のインデックスを検索）
+  // 今日の最高・最低気温（fc[0] timeSeries[2] temps配列から取得）
   const tmpTs2   = ts[2];
   const tmpArea2 = tmpTs2?.areas?.[0];
-  const todayKey2 = jstDateKey(new Date());
-  // "YYYY-MM-DDT00:00:00+09:00" のインデックスを探す
-  const tIdx = tmpTs2?.timeDefines?.findIndex(td => td.startsWith(todayKey2) && td.includes('T00:')) ?? -1;
-  const tMax = tIdx >= 0 ? tmpArea2?.tempsMax?.[tIdx] : null;
-  const tMin = tIdx >= 0 ? tmpArea2?.tempsMin?.[tIdx] : null;
-  const maxStr = tMax && tMax !== '' ? Math.round(parseFloat(tMax)) : '--';
-  const minStr = tMin && tMin !== '' ? Math.round(parseFloat(tMin)) : '--';
-  document.getElementById('wx-range-text').textContent = `最高 ${maxStr}° / 最低 ${minStr}°`;
+  const temps    = tmpArea2?.temps || [];
+  // temps: [今日最高(09:00), 今日最低(00:00), 明日最低, 明日最高] の順
+  const tMax = temps[0] && temps[0] !== '' ? Math.round(parseFloat(temps[0])) : '--';
+  const tMin = temps[1] && temps[1] !== '' ? Math.round(parseFloat(temps[1])) : '--';
+  document.getElementById('wx-range-text').textContent = `最高 ${tMax}° / 最低 ${tMin}°`;
 }
 
 // AMeDAS 実況値（気温・湿度・風速）を上書き反映
