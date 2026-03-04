@@ -1365,9 +1365,7 @@ if ('serviceWorker' in navigator) {
 
   setTimeout(() => {
     if (Notification.permission !== 'granted') return;
-    const notifRain     = localStorage.getItem('notif_rain')     !== 'false';
-    const notifSchedule = localStorage.getItem('notif_schedule') !== 'false';
-
+    const notifRain    = localStorage.getItem('notif_rain')    !== 'false';
     const notifMorning = localStorage.getItem('notif_morning') !== 'false';
     // 朝のまとめ通知
     if (notifMorning) {
@@ -1421,7 +1419,6 @@ function _doSchedule(swController) {
       rainProb: TODAY_RAIN_PROB,
       schedule: getTodaySchedule(),
       notifRain,
-      notifSchedule,
     },
   });
 }
