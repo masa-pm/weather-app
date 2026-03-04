@@ -401,7 +401,7 @@ body{
     line-height: 1;
   }
   .cal-hdr { display: flex; align-items: center; justify-content: space-between; }
-  .cd.selected { background: rgba(255,255,255,0.4); border-radius: 50%; font-weight: bold; }
+  .cd.selected { background: #fff; border-radius: 50%; font-weight: bold; color: #1a73e8; }
   .cd.empty { pointer-events: none; }
 
 </style>
@@ -460,7 +460,10 @@ body{
 
     <!-- Schedule Scroll Area -->
     <div class="sch-area">
-      <div class="sch-ttl">📅 今週の予定</div>
+      <div class="sch-ttl" style="display:flex;align-items:center;justify-content:space-between;padding-right:8px">
+        <span>📅 今週の予定</span>
+        <button onclick="gcalSync();renderHomeSchedule();" style="background:none;border:none;font-size:18px;cursor:pointer;color:#555">&#x21bb;</button>
+      </div>
       <div id="home-day-cards"></div>
     </div><!-- /sch-area -->
   </div><!-- /screen-home -->
@@ -471,9 +474,10 @@ body{
       <button class="cal-nav-btn cal-nav-btn-prev" onclick="calChangeMonth(-1)">&#8249;</button>
       <div>
         <div class="cal-hdr-title" id="cal-hdr-title">2026年 3月</div>
-        <div class="cal-hdr-sub">カレンダー</div>
+  
       </div>
       <button class="cal-nav-btn cal-nav-btn-next" onclick="calChangeMonth(1)">&#8250;</button>
+      <button class="cal-nav-btn" onclick="gcalSync();renderCalendar();" style="font-size:18px">&#x21bb;</button>
     </div>
     <div class="cal-body">
       <div class="cal-grid-wrap">
@@ -512,14 +516,7 @@ body{
             <button class="btn btn-connect-sm" id="gcalBtn" onclick="toggleGcal()">接続する</button>
           </div>
         </div>
-        <div class="set-row" id="gcalSyncRow" style="display:none">
-          <div class="set-ico ico-g">🔄</div>
-          <div class="set-info">
-            <div class="set-lbl">予定を同期する</div>
-            <div class="set-sub">今後30日分を取り込む</div>
-          </div>
-          <button class="btn btn-connect-sm" onclick="gcalSync()">同期</button>
-        </div>
+
       </div>
 
       <!-- Weather Settings -->
@@ -1135,6 +1132,63 @@ async function gcalSync() {
   }
 }
 
+// ─── 日本の祝日データ（2026-2028）─────────────────────────────────────────────
+const JP_HOLIDAYS = {
+  // 2026年
+  '2026-01-01': '元日',
+  '2026-01-12': '成人の日',
+  '2026-02-11': '建国記念の日',
+  '2026-02-23': '天皇誕生日',
+  '2026-03-20': '春分の日',
+  '2026-04-29': '昭和の日',
+  '2026-05-03': '憲法記念日',
+  '2026-05-04': 'みどりの日',
+  '2026-05-05': 'こどもの日',
+  '2026-05-06': '振替休日',
+  '2026-07-20': '海の日',
+  '2026-08-10': '山の日',
+  '2026-09-21': '敬老の日',
+  '2026-09-22': '国民の休日',
+  '2026-09-23': '秋分の日',
+  '2026-10-12': 'スポーツの日',
+  '2026-11-03': '文化の日',
+  '2026-11-23': '勤労感謝の日',
+  // 2027年
+  '2027-01-01': '元日',
+  '2027-01-11': '成人の日',
+  '2027-02-11': '建国記念の日',
+  '2027-02-23': '天皇誕生日',
+  '2027-03-21': '春分の日',
+  '2027-04-29': '昭和の日',
+  '2027-05-03': '憲法記念日',
+  '2027-05-04': 'みどりの日',
+  '2027-05-05': 'こどもの日',
+  '2027-07-19': '海の日',
+  '2027-08-11': '山の日',
+  '2027-09-20': '敬老の日',
+  '2027-09-23': '秋分の日',
+  '2027-10-11': 'スポーツの日',
+  '2027-11-03': '文化の日',
+  '2027-11-23': '勤労感謝の日',
+  // 2028年
+  '2028-01-01': '元日',
+  '2028-01-10': '成人の日',
+  '2028-02-11': '建国記念の日',
+  '2028-02-23': '天皇誕生日',
+  '2028-03-20': '春分の日',
+  '2028-04-29': '昭和の日',
+  '2028-05-03': '憲法記念日',
+  '2028-05-04': 'みどりの日',
+  '2028-05-05': 'こどもの日',
+  '2028-07-17': '海の日',
+  '2028-08-11': '山の日',
+  '2028-09-18': '敬老の日',
+  '2028-09-22': '秋分の日',
+  '2028-10-09': 'スポーツの日',
+  '2028-11-03': '文化の日',
+  '2028-11-23': '勤労感謝の日',
+};
+
 // ─── Calendar rendering ──────────────────────────────────────────────────────
 const DAY_NAMES = ['日','月','火','水','木','金','土'];
 let calYear  = new Date().getFullYear();
@@ -1176,15 +1230,17 @@ function renderCalendar() {
     const key = calDateKey(calYear, calMonth, d);
     const dow = (firstDay + d - 1) % 7;
     const hasEv = schedules.some(s => s.date === key);
+    const isHoliday = !!JP_HOLIDAYS[key];
     const el = document.createElement('div');
     let cls = 'cd';
-    if (dow === 0) cls += ' sun';
+    if (dow === 0 || isHoliday) cls += ' sun';
     if (dow === 6) cls += ' sat';
     if (key === todayKey) cls += ' today';
     if (key === calSelectedDate) cls += ' selected';
-    if (hasEv) cls += ' has-ev';
+    if (hasEv || isHoliday) cls += ' has-ev';
     el.className = cls;
     el.textContent = d;
+    if (isHoliday) el.title = JP_HOLIDAYS[key];
     el.addEventListener('click', () => {
       calSelectedDate = key;
       renderCalendar();
@@ -1207,11 +1263,15 @@ function renderEventList(dateKey) {
 
   const dayEvs = schedules.filter(s => s.date === dateKey)
     .sort((a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99'));
+  const holiday = JP_HOLIDAYS[dateKey];
 
   let html = `<div class="cal-ev-ttl">📅 ${label}の予定</div>`;
-  if (!dayEvs.length) {
+  if (holiday) {
+    html += `<div class="cal-ev-item"><div class="cal-ev-dot" style="background:#e53935"></div><div class="cal-ev-info"><div class="cal-ev-name">${holiday}</div><div class="cal-ev-time">祝日</div></div></div>`;
+  }
+  if (!dayEvs.length && !holiday) {
     html += `<div style="padding:16px;color:#aaa;text-align:center;">予定はありません</div>`;
-  } else {
+  } else if (dayEvs.length) {
     dayEvs.forEach(ev => {
       const timeStr = ev.allDay ? '終日' : ev.startTime + (ev.endTime ? ' 〜 ' + ev.endTime : '');
       html += `
