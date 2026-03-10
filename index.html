@@ -1505,6 +1505,9 @@ function _doSchedule(swController) {
       rainProb: TODAY_RAIN_PROB,
       schedule: getTodaySchedule(),
       notifRain,
+      notifSchedule: notifMorning,
+      wxDesc: wxDescCache || '',
+      wxTemp: tempCache || '',
     },
   });
 }

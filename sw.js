@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'wx-app-v5';
+const CACHE_NAME = 'wx-app-v6';
 const PRECACHE = [
   './',
   './index.html',
@@ -9,7 +9,6 @@ const PRECACHE = [
   './icon-512.svg',
 ];
 
-// ─── Install: precache static assets ──────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -18,7 +17,6 @@ self.addEventListener('install', event => {
   );
 });
 
-// ─── Activate: delete old caches ──────────────────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
@@ -29,7 +27,6 @@ self.addEventListener('activate', event => {
   );
 });
 
-// ─── Fetch: cache-first, network fallback ─────────────────────────────────────
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
@@ -48,80 +45,81 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ─── Notification Scheduling ──────────────────────────────────────────────────
-// Note: SW setTimeout is best-effort. For guaranteed background delivery,
-// a backend push server (Web Push Protocol) would be needed.
-let _rainTimer = null;
-let _schedTimer = null;
+// ─── Notification Scheduling ───────────────────────────────────────────────────
+let _timer = null;
+let _savedPayload = null;
 
 self.addEventListener('message', event => {
   const data = event.data;
   if (!data) return;
 
   if (data.type === 'SCHEDULE_NOTIFICATION') {
-    clearTimers();
+    clearTimer();
     const { delay, payload } = data;
     if (!delay || delay <= 0) return;
-    scheduleTimers(delay, payload);
+    _savedPayload = payload;
+    scheduleTimer(delay, payload);
   }
 
   if (data.type === 'CANCEL_NOTIFICATION') {
-    clearTimers();
+    clearTimer();
+    _savedPayload = null;
   }
 });
 
-function clearTimers() {
-  if (_rainTimer)   { clearTimeout(_rainTimer);   _rainTimer = null; }
-  if (_schedTimer)  { clearTimeout(_schedTimer);  _schedTimer = null; }
+// SWが再起動した時に再スケジュール
+self.addEventListener('activate', () => {
+  // activate後に再スケジュールは不要（クライアントから再送される）
+});
+
+function clearTimer() {
+  if (_timer) { clearTimeout(_timer); _timer = null; }
 }
 
-function scheduleTimers(delay, payload) {
-  const { rainProb, schedule, notifRain, notifSchedule } = payload;
+function scheduleTimer(delay, payload) {
+  _timer = setTimeout(() => {
+    fireNotifications(payload);
+    // 翌日同時刻に再スケジュール
+    _timer = setTimeout(
+      () => fireNotifications(payload),
+      24 * 60 * 60 * 1000
+    );
+  }, delay);
+}
 
+function fireNotifications(payload) {
+  const { rainProb, schedule, notifRain, notifSchedule, wxDesc, wxTemp } = payload;
+
+  // 朝のまとめ通知
+  if (notifSchedule) {
+    let body = `${wxDesc || ''}　${wxTemp || ''}°C`;
+    if (schedule && schedule.length > 0) {
+      const evTexts = schedule.slice(0, 3).map(e => `${e.time ? e.time + ' ' : ''}${e.title}`).join('、');
+      body += `\n📅 ${evTexts}`;
+    } else {
+      body += '\n📅 今日の予定はありません';
+    }
+    self.registration.showNotification('今日の天気と予定', {
+      body,
+      icon: './icon-192.svg',
+      badge: './icon-192.svg',
+      tag: 'wx-morning',
+      vibrate: [200, 100, 200],
+    });
+  }
+
+  // 雨の通知
   if (notifRain && rainProb >= 30) {
-    _rainTimer = setTimeout(() => {
-      self.registration.showNotification('今日の天気', {
-        body: `🌧 今日は雨の可能性があります（降水確率${rainProb}%）。傘を忘れずに！`,
-        icon: './icon-192.svg',
-        badge: './icon-192.svg',
-        tag: 'wx-rain',
-        vibrate: [200, 100, 200],
-      });
-      // Reschedule for next day
-      _rainTimer = setTimeout(
-        () => self.registration.showNotification('今日の天気', {
-          body: `🌧 今日は雨の可能性があります（降水確率${rainProb}%）。傘を忘れずに！`,
-          icon: './icon-192.svg', badge: './icon-192.svg', tag: 'wx-rain',
-        }),
-        24 * 60 * 60 * 1000
-      );
-    }, delay);
-  }
-
-  if (notifSchedule && schedule && schedule.length > 0) {
-    const ev = schedule[0];
-    const timeStr = ev.time ? ` ${ev.time}` : '';
-    _schedTimer = setTimeout(() => {
-      self.registration.showNotification('今日の予定', {
-        body: `📅 今日の予定：${ev.title}${timeStr}`,
-        icon: './icon-192.svg',
-        badge: './icon-192.svg',
-        tag: 'wx-schedule',
-        vibrate: [200],
-      });
-      // Reschedule for next day
-      _schedTimer = setTimeout(
-        () => self.registration.showNotification('今日の予定', {
-          body: `📅 今日の予定：${ev.title}${timeStr}`,
-          icon: './icon-192.svg', badge: './icon-192.svg', tag: 'wx-schedule',
-        }),
-        24 * 60 * 60 * 1000
-      );
-    }, delay);
+    self.registration.showNotification('☂️ 今日は雨の可能性があります', {
+      body: `降水確率${rainProb}%。傘をお忘れなく！`,
+      icon: './icon-192.svg',
+      badge: './icon-192.svg',
+      tag: 'wx-rain',
+      vibrate: [200, 100, 200],
+    });
   }
 }
 
-// ─── Notification click: focus or open app ────────────────────────────────────
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil(
