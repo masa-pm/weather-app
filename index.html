@@ -11,7 +11,6 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script>
 firebase.initializeApp({
   apiKey: 'AIzaSyDZhSzqZ4pt6HZ3PeEzeYo-kd_3wh6m7Eo',
@@ -22,7 +21,6 @@ firebase.initializeApp({
   appId: '1:896788626272:web:af4c8a6eca51a036d7fc05',
 });
 const _db = firebase.firestore();
-const _fbMessaging = firebase.messaging();
 </script>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -1517,29 +1515,44 @@ if ('serviceWorker' in navigator) {
 })();
 
 // ─── Schedule notification via SW ─────────────────────────────────────────────
-// ─── Firebase FCM token & Firestore sync ──────────────────────────────────────
-const FCM_VAPID = 'BHbqCo99UE1616RKQk5jXNUpVUNVl6S4K7fzITVSAjNRPA9kE6CI4ApigeIRCMqnJAMqMKXqUnl2bFrKpGFt73Y';
+// ─── Web Push subscription & Firestore sync ───────────────────────────────────
+const VAPID_PUBLIC_KEY = 'BAUhHpE0p05_zTL8EFYHP3QEFZ75Tt3oK9TnBOwOO-J5cGTu_cIcJFpppN8B4fgsltZiTRuLCrJVlD2FiM387v4';
 
-async function getFCMToken() {
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function getPushSubscription() {
   try {
-    const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-    return await _fbMessaging.getToken({ vapidKey: FCM_VAPID, serviceWorkerRegistration: swReg });
+    const swReg = await navigator.serviceWorker.ready;
+    let sub = await swReg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await swReg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    console.log('[WebPush] subscription OK');
+    return sub;
   } catch (e) {
-    console.warn('[FCM] getToken failed', e);
+    console.warn('[WebPush] subscribe failed', e);
     return null;
   }
 }
 
 async function syncFirestore() {
   try {
-    const token = await getFCMToken();
+    const sub = await getPushSubscription();
     const lat = parseFloat(localStorage.getItem('wx_lat') || '35.6895');
     const lon = parseFloat(localStorage.getItem('wx_lon') || '139.6917');
     const notifRain    = localStorage.getItem('notif_rain')    !== 'false';
     const notifMorning = localStorage.getItem('notif_morning') !== 'false';
     const todaySchedule = getTodaySchedule();
     const data = { lat, lon, notifRain, notifMorning, todaySchedule };
-    if (token) data.fcmToken = token;
+    if (sub) data.pushSubscription = JSON.stringify(sub);
     await _db.doc('users/default').set(data, { merge: true });
     console.log('[Firestore] synced');
   } catch (e) {

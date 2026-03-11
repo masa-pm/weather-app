@@ -1,6 +1,20 @@
 'use strict';
 
-const CACHE_NAME = 'wx-app-v10';
+// ─── Web Push ─────────────────────────────────────────────────────────────────
+self.addEventListener('push', event => {
+  if (!event.data) return;
+  const d = event.data.json();
+  event.waitUntil(fireNotifications({
+    rainProb:      parseInt(d.rainProb || '0', 10),
+    schedule:      d.schedule || [],
+    notifRain:     d.notifRain     === true || d.notifRain     === 'true',
+    notifSchedule: d.notifSchedule === true || d.notifSchedule === 'true',
+    wxDesc:        d.wxDesc  || '',
+    wxTemp:        d.wxTemp  || '',
+  }));
+});
+
+const CACHE_NAME = 'wx-app-v11';
 const PRECACHE = [
   './manifest.json',
   './icon-192.svg',

@@ -2,12 +2,12 @@
 /**
  * send-notify.mjs
  * GitHub Actions から毎朝 JST 7:00 に実行される通知送信スクリプト。
- * Firestore からユーザー設定・FCMトークン・今日の予定を取得し、
- * JMA API で天気を取得して FCM Data メッセージを送信する。
+ * Firestore からユーザー設定・PushSubscription・今日の予定を取得し、
+ * JMA API で天気を取得して Web Push を送信する。
  */
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore }        from 'firebase-admin/firestore';
-import { getMessaging }        from 'firebase-admin/messaging';
+import webpush                 from 'web-push';
 
 // ─── Firebase Admin 初期化 ─────────────────────────────────────────────────────
 const serviceAccount = {
@@ -18,8 +18,14 @@ const serviceAccount = {
 };
 
 initializeApp({ credential: cert(serviceAccount) });
-const db        = getFirestore();
-const messaging = getMessaging();
+const db = getFirestore();
+
+// ─── VAPID 設定 ───────────────────────────────────────────────────────────────
+webpush.setVapidDetails(
+  'mailto:example@example.com',
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY,
+);
 
 // ─── JMA 都道府県テーブル [緯度, 経度, コード, 名称] ──────────────────────────
 const JMA_PREFS = [
@@ -66,31 +72,23 @@ async function fetchWeather(lat, lon) {
   if (!res.ok) throw new Error(`JMA fetch failed: ${res.status}`);
   const fc   = await res.json();
 
-  // 今日の予報 (series[0] が今日・明日・明後日)
   const today = fc[0]?.timeSeries?.[0];
   const wxDesc = today?.areas?.[0]?.weathers?.[0] || '';
 
-  // 降水確率 (series[0]→timeSeries[1] または series[1])
   let rainProb = 0;
   try {
-    const popSeries = fc[0]?.timeSeries?.find(ts =>
-      ts.areas?.[0]?.pops !== undefined
-    );
+    const popSeries = fc[0]?.timeSeries?.find(ts => ts.areas?.[0]?.pops !== undefined);
     if (popSeries) {
       const pops = popSeries.areas[0].pops.slice(0, 4).filter(p => p !== '--');
       if (pops.length) rainProb = Math.max(...pops.map(Number));
     }
   } catch (_) { /* ignore */ }
 
-  // 最高気温 (temps の 2番目が最高気温)
   let wxTemp = '';
   try {
-    const tmpSeries = fc[0]?.timeSeries?.find(ts =>
-      ts.areas?.[0]?.temps !== undefined
-    );
+    const tmpSeries = fc[0]?.timeSeries?.find(ts => ts.areas?.[0]?.temps !== undefined);
     if (tmpSeries) {
       const temps = tmpSeries.areas[0].temps;
-      // temps[0] = 最低, temps[1] = 最高
       if (temps.length >= 2 && temps[1] !== '--') wxTemp = temps[1];
       else if (temps[0] !== '--') wxTemp = temps[0];
     }
@@ -107,10 +105,10 @@ if (!snap.exists) {
 }
 
 const user = snap.data();
-const { fcmToken, notifRain, notifMorning, lat, lon, todaySchedule } = user;
+const { pushSubscription, notifRain, notifMorning, lat, lon, todaySchedule } = user;
 
-if (!fcmToken) {
-  console.log('No FCM token. Exiting.');
+if (!pushSubscription) {
+  console.log('No push subscription. Exiting.');
   process.exit(0);
 }
 
@@ -134,32 +132,25 @@ console.log('Weather:', weather);
 console.log('notifRain:', notifRain, '  notifMorning:', notifMorning);
 console.log('todaySchedule:', todaySchedule);
 
-// FCM データメッセージ送信（通知表示はSWの onBackgroundMessage で行う）
-const message = {
-  token: fcmToken,
-  data: {
-    rainProb:      String(weather.rainProb),
-    schedule:      JSON.stringify(todaySchedule || []),
-    notifRain:     String(!!notifRain),
-    notifSchedule: String(!!notifMorning),
-    wxDesc:        weather.wxDesc,
-    wxTemp:        weather.wxTemp,
-  },
-  android: { priority: 'high' },
-  apns:    { payload: { aps: { contentAvailable: true } } },
-  webpush: { headers: { Urgency: 'high' } },
-};
+const payload = JSON.stringify({
+  rainProb:      weather.rainProb,
+  schedule:      todaySchedule || [],
+  notifRain:     !!notifRain,
+  notifSchedule: !!notifMorning,
+  wxDesc:        weather.wxDesc,
+  wxTemp:        weather.wxTemp,
+});
 
 try {
-  const result = await messaging.send(message);
-  console.log('FCM sent:', result);
+  const sub = JSON.parse(pushSubscription);
+  await webpush.sendNotification(sub, payload);
+  console.log('Web Push sent successfully.');
 } catch (e) {
-  console.error('FCM send failed:', e.message);
-  // トークン無効の場合は Firestore をクリア
-  if (e.code === 'messaging/registration-token-not-registered' ||
-      e.code === 'messaging/invalid-registration-token') {
-    await db.doc('users/default').update({ fcmToken: null });
-    console.log('Invalid token cleared from Firestore.');
+  console.error('Web Push send failed:', e.statusCode, e.message);
+  // サブスクリプション無効の場合は Firestore をクリア
+  if (e.statusCode === 404 || e.statusCode === 410) {
+    await db.doc('users/default').update({ pushSubscription: null });
+    console.log('Invalid subscription cleared from Firestore.');
   }
   process.exit(1);
 }
