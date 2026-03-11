@@ -1522,7 +1522,8 @@ const FCM_VAPID = 'BHbqCo99UE1616RKQk5jXNUpVUNVl6S4K7fzITVSAjNRPA9kE6CI4ApigeIRC
 
 async function getFCMToken() {
   try {
-    return await _fbMessaging.getToken({ vapidKey: FCM_VAPID });
+    const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+    return await _fbMessaging.getToken({ vapidKey: FCM_VAPID, serviceWorkerRegistration: swReg });
   } catch (e) {
     console.warn('[FCM] getToken failed', e);
     return null;
