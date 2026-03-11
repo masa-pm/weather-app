@@ -8,6 +8,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Outfit:wght@200;300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: 'AIzaSyDZhSzqZ4pt6HZ3PeEzeYo-kd_3wh6m7Eo',
+  authDomain: 'my-weather-app-77971.firebaseapp.com',
+  projectId: 'my-weather-app-77971',
+  storageBucket: 'my-weather-app-77971.firebasestorage.app',
+  messagingSenderId: '896788626272',
+  appId: '1:896788626272:web:af4c8a6eca51a036d7fc05',
+});
+const _db = firebase.firestore();
+const _fbMessaging = firebase.messaging();
+</script>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#3d3d3d">
@@ -850,6 +866,8 @@ function loadWeatherSettings() {
 }
 
 async function loadWeatherData(lat, lon) {
+  localStorage.setItem('wx_lat', lat);
+  localStorage.setItem('wx_lon', lon);
   const pref = getNearestPref(lat, lon);
   document.getElementById('wx-location-text').textContent = pref.name;
 
@@ -1499,6 +1517,36 @@ if ('serviceWorker' in navigator) {
 })();
 
 // ─── Schedule notification via SW ─────────────────────────────────────────────
+// ─── Firebase FCM token & Firestore sync ──────────────────────────────────────
+const FCM_VAPID = 'BHbqCo99UE1616RKQk5jXNUpVUNVl6S4K7fzITVSAjNRPA9kE6CI4ApigeIRCMqnJAMqMKXqUnl2bFrKpGFt73Y';
+
+async function getFCMToken() {
+  try {
+    const swReg = await navigator.serviceWorker.ready;
+    return await _fbMessaging.getToken({ vapidKey: FCM_VAPID, serviceWorkerRegistration: swReg });
+  } catch (e) {
+    console.warn('[FCM] getToken failed', e);
+    return null;
+  }
+}
+
+async function syncFirestore() {
+  try {
+    const token = await getFCMToken();
+    const lat = parseFloat(localStorage.getItem('wx_lat') || '35.6895');
+    const lon = parseFloat(localStorage.getItem('wx_lon') || '139.6917');
+    const notifRain    = localStorage.getItem('notif_rain')    !== 'false';
+    const notifMorning = localStorage.getItem('notif_morning') !== 'false';
+    const todaySchedule = getTodaySchedule();
+    const data = { lat, lon, notifRain, notifMorning, todaySchedule };
+    if (token) data.fcmToken = token;
+    await _db.doc('users/default').set(data, { merge: true });
+    console.log('[Firestore] synced');
+  } catch (e) {
+    console.warn('[Firestore] sync failed', e);
+  }
+}
+
 function scheduleNotification() {
   if (Notification.permission !== 'granted') return;
   navigator.serviceWorker?.ready.then(reg => {
@@ -1550,7 +1598,10 @@ function requestNotifPermission() {
   document.getElementById('notifOverlay').style.display = 'none';
   Notification.requestPermission().then(perm => {
     updateNotifBadge(perm);
-    if (perm === 'granted') scheduleNotification();
+    if (perm === 'granted') {
+      scheduleNotification();
+      syncFirestore();
+    }
   });
 }
 
@@ -1566,6 +1617,7 @@ function onToggle(el, key) {
 
   if (Notification.permission === 'granted') {
     scheduleNotification();
+    syncFirestore();
   } else if (el.classList.contains('on') && Notification.permission === 'default') {
     // Offer permission if user turns on a toggle
     document.getElementById('notifOverlay').style.display = 'flex';
@@ -1599,6 +1651,11 @@ window.addEventListener('load', () => {
 
   // Update notification badge
   if ('Notification' in window) updateNotifBadge(Notification.permission);
+
+  // Firestore sync (FCM token + settings + schedule) on load if permission granted
+  if ('Notification' in window && Notification.permission === 'granted') {
+    syncFirestore();
+  }
 
   // Restore toggle states from localStorage
   ['schedule', 'rain', 'morning'].forEach(key => {
