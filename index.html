@@ -1052,14 +1052,17 @@ function onGcalToken(resp) {
     return;
   }
   gcalToken = resp.access_token;
+  localStorage.setItem('gcal_connected', '1');
   renderGcalUI(true);
   gcalSync();
 }
+
 
 function gcalSignOut() {
   if (gcalToken) google.accounts.oauth2.revoke(gcalToken, () => {});
   gcalToken = null;
   gcalTokenClient = null;
+  localStorage.removeItem('gcal_connected');
   renderGcalUI(false);
 }
 
@@ -1098,25 +1101,42 @@ function renderGcalUI(connected) {
 }
 
 async function gcalSync() {
-  if (!gcalToken) { alert('先にGoogleカレンダーを接続してください。'); return; }
-  const monthStart = new Date(calYear, calMonth, 1);
-  const monthEnd   = new Date(calYear, calMonth + 1, 1);
+  if (!gcalToken) {
+    if (localStorage.getItem('gcal_connected') !== '1') {
+      alert('先にGoogleカレンダーを接続してください。'); return;
+    }
+    // 以前に接続済みのため再認証（onGcalToken → gcalSync の流れで実行される）
+    gcalSignIn();
+    return;
+  }
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 2, 1);
   const timeMin = monthStart.toISOString();
   const timeMax = monthEnd.toISOString();
-  const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?' +
+  const baseUrl = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?' +
     'timeMin=' + encodeURIComponent(timeMin) +
     '&timeMax=' + encodeURIComponent(timeMax) +
     '&singleEvents=true&orderBy=startTime&maxResults=250';
   try {
-    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + gcalToken } });
-    if (res.status === 401) { gcalSignOut(); alert('認証が切れました。再接続してください。'); return; }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const items = data.items || [];
-    if (!items.length) { alert('今後30日間に予定がありません。'); return; }
-    if (!confirm('Googleカレンダーから ' + items.length + ' 件の予定を取り込みますか？')) return;
+    let allItems = [];
+    let pageToken = '';
+    do {
+      const url = baseUrl + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + gcalToken } });
+      if (res.status === 401) { gcalSignOut(); alert('認証が切れました。再接続してください。'); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      allItems = allItems.concat(data.items || []);
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+
+    const m1 = now.getMonth() + 1;
+    const m2 = now.getMonth() + 2 <= 12 ? now.getMonth() + 2 : 1;
+    if (!allItems.length) { alert(`${m1}月・${m2}月の予定がありません。`); return; }
+    if (!confirm(`Googleカレンダーから ${m1}月・${m2}月の計 ${allItems.length} 件を取り込みますか？`)) return;
     // Googleから取得した予定で上書き（重複防止）
-    const gcalItems = items.map(item => {
+    const gcalItems = allItems.map(item => {
       const start = item.start?.dateTime || item.start?.date || '';
       const end   = item.end?.dateTime   || item.end?.date   || '';
       const isAllDay = !item.start?.dateTime;
@@ -1137,7 +1157,7 @@ async function gcalSync() {
     localStorage.setItem('schedules', JSON.stringify([...manual, ...gcalItems]));
     renderCalendar();
     renderHomeSchedule();
-    alert(items.length + ' 件を取り込みました！');
+    alert(`${m1}月・${m2}月から ${allItems.length} 件を取り込みました！`);
   } catch (e) {
     alert('同期中にエラーが発生しました: ' + e.message);
   }
@@ -1573,6 +1593,9 @@ window.addEventListener('load', () => {
   // 設定を復元してから天気データ取得
   loadWeatherSettings();
   initWeather();
+
+  // Google Calendar UI を localStorage から復元
+  if (localStorage.getItem('gcal_connected') === '1') renderGcalUI(true);
 
   // Update notification badge
   if ('Notification' in window) updateNotifBadge(Notification.permission);

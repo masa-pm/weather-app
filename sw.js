@@ -1,9 +1,7 @@
 'use strict';
 
-const CACHE_NAME = 'wx-app-v6';
+const CACHE_NAME = 'wx-app-v9';
 const PRECACHE = [
-  './',
-  './index.html',
   './manifest.json',
   './icon-192.svg',
   './icon-512.svg',
@@ -29,6 +27,14 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  // HTMLはHTTPキャッシュも使わず常にサーバーから取得
+  if (url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
+    event.respondWith(
+      fetch(url.href, { cache: 'no-store' }).catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
