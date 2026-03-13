@@ -1168,7 +1168,7 @@ async function gcalSync() {
       };
     });
     // 手動追加の予定は残し、gcal予定だけ置き換え
-    const stored = JSON.parse(localStorage.getItem('schedules') || '[]');
+    const stored = (() => { try { return JSON.parse(localStorage.getItem('schedules') || '[]'); } catch { return []; } })();
     const manual = stored.filter(s => s.source !== 'gcal');
     localStorage.setItem('schedules', JSON.stringify([...manual, ...gcalItems]));
     renderCalendar();
@@ -1242,8 +1242,13 @@ let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth(); // 0-based
 let calSelectedDate = null; // "YYYY-MM-DD"
 
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function getSchedules() {
-  return JSON.parse(localStorage.getItem('schedules') || '[]');
+  try { return JSON.parse(localStorage.getItem('schedules') || '[]'); }
+  catch { return []; }
 }
 
 function calDateKey(y, m, d) {
@@ -1325,7 +1330,7 @@ function renderEventList(dateKey) {
         <div class="cal-ev-item">
           <div class="cal-ev-dot dot-blue"></div>
           <div class="cal-ev-info">
-            <div class="cal-ev-name">${ev.title}</div>
+            <div class="cal-ev-name">${escHtml(ev.title)}</div>
             <div class="cal-ev-time">${timeStr}</div>
           </div>
         </div>`;
@@ -1396,7 +1401,7 @@ function renderHomeSchedule() {
     dayEvs.forEach(ev => {
       const timeStr = ev.allDay ? '終日' : ev.startTime;
       const cls = ev.allDay ? 'ev allday' : 'ev timed';
-      evHtml += `<div class="${cls}"><span class="ev-time">${timeStr}</span><span class="ev-title">${ev.title}</span></div>`;
+      evHtml += `<div class="${cls}"><span class="ev-time">${escHtml(timeStr)}</span><span class="ev-title">${escHtml(ev.title)}</span></div>`;
     });
 
     html += `
