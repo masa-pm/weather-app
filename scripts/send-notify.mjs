@@ -107,6 +107,13 @@ if (!snap.exists) {
 const user = snap.data();
 const { pushSubscription, notifRain, notifMorning, lat, lon, todaySchedule } = user;
 
+// JST当日の日付キー（スクリプトはUTC 22:00 = JST 07:00に実行）
+const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+const todayKey = jstNow.toISOString().slice(0, 10); // "YYYY-MM-DD"
+// Firestoreに保存された予定を当日分のみに絞る（前日の予定を除外）
+const todayScheduleFiltered = (todaySchedule || []).filter(s => s.date === todayKey);
+console.log(`[schedule] today=${todayKey}, stored=${(todaySchedule||[]).length}件 → filtered=${todayScheduleFiltered.length}件`);
+
 if (!pushSubscription) {
   console.log('No push subscription. Exiting.');
   process.exit(0);
@@ -134,7 +141,7 @@ console.log('todaySchedule:', todaySchedule);
 
 const payload = JSON.stringify({
   rainProb:      weather.rainProb,
-  schedule:      todaySchedule || [],
+  schedule:      todayScheduleFiltered,
   notifRain:     !!notifRain,
   notifSchedule: !!notifMorning,
   wxDesc:        weather.wxDesc,
