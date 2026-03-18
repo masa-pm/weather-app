@@ -2,7 +2,7 @@ name: 毎朝7時 Push通知送信
 
 on:
   schedule:
-    - cron: '0 22 * * *'   # UTC 22:00 = JST 07:00
+    - cron: '30 20 * * *'  # UTC 20:30 = JST 05:30（遅延見込み）
   workflow_dispatch:         # 手動テスト用
 
 jobs:
