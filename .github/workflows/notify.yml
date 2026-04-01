@@ -9,113 +9,26 @@ jobs:
   send-notify:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: 依存パッケージをインストール
-        run: |
-          mkdir -p /tmp/notify
-          cd /tmp/notify
-          echo '{"type":"module","dependencies":{"firebase-admin":"^12.0.0","web-push":"^3.6.7"}}' > package.json
-          npm install --silent
+        run: cd scripts && npm install --silent
+
+      - name: マーケットデータ取得・Firestore保存
+        continue-on-error: true
+        run: node scripts/fetch-market.mjs
+        env:
+          FIREBASE_PROJECT_ID:   ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY:  ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}
 
       - name: 通知送信
-        run: |
-          cat > /tmp/notify/send-notify.mjs << 'SCRIPT'
-          import { initializeApp, cert } from 'firebase-admin/app';
-          import { getFirestore }        from 'firebase-admin/firestore';
-          import webpush                 from 'web-push';
-
-          const serviceAccount = {
-            type: 'service_account',
-            project_id:   process.env.FIREBASE_PROJECT_ID,
-            client_email: process.env.FIREBASE_CLIENT_EMAIL,
-            private_key:  (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-          };
-          initializeApp({ credential: cert(serviceAccount) });
-          const db = getFirestore();
-
-          webpush.setVapidDetails(
-            'mailto:example@example.com',
-            process.env.VAPID_PUBLIC_KEY,
-            process.env.VAPID_PRIVATE_KEY,
-          );
-
-          const JMA_PREFS = [
-            [43.06,141.35,'016000'],[40.82,140.74,'020000'],[39.70,141.13,'030000'],
-            [38.27,140.87,'040000'],[39.72,140.10,'050000'],[38.24,140.36,'060000'],
-            [37.75,140.47,'070000'],[36.34,140.45,'080000'],[36.57,139.88,'090000'],
-            [36.39,139.06,'100000'],[35.86,139.65,'110000'],[35.61,140.12,'120000'],
-            [35.69,139.69,'130000'],[35.45,139.64,'140000'],[37.90,139.02,'150000'],
-            [36.70,137.21,'160000'],[36.59,136.63,'170000'],[36.06,136.22,'180000'],
-            [35.66,138.57,'190000'],[36.65,138.18,'200000'],[35.39,136.72,'210000'],
-            [34.97,138.38,'220000'],[35.18,136.91,'230000'],[34.73,136.51,'240000'],
-            [35.00,135.87,'250000'],[35.02,135.76,'260000'],[34.69,135.50,'270000'],
-            [34.69,135.18,'280000'],[34.69,135.83,'290000'],[34.23,135.17,'300000'],
-            [35.50,134.24,'310000'],[35.47,133.05,'320000'],[34.66,133.93,'330000'],
-            [34.40,132.46,'340000'],[34.19,131.47,'350000'],[34.07,134.56,'360000'],
-            [34.34,134.04,'370000'],[33.84,132.77,'380000'],[33.56,133.53,'390000'],
-            [33.61,130.42,'400000'],[33.25,130.30,'410000'],[32.74,129.87,'420000'],
-            [32.79,130.74,'430000'],[33.24,131.61,'440000'],[31.91,131.42,'450000'],
-            [31.56,130.56,'460100'],[26.21,127.68,'471000'],
-          ];
-          function getNearestPref(lat, lon) {
-            let best = JMA_PREFS[0], bestD = Infinity;
-            for (const p of JMA_PREFS) {
-              const d = (lat-p[0])**2 + (lon-p[1])**2;
-              if (d < bestD) { bestD = d; best = p; }
-            }
-            return best[2];
-          }
-          async function fetchWeather(lat, lon) {
-            const code = getNearestPref(lat, lon);
-            const res = await fetch(`https://www.jma.go.jp/bosai/forecast/data/forecast/${code}.json`);
-            if (!res.ok) throw new Error(`JMA ${res.status}`);
-            const fc = await res.json();
-            const wxDesc = fc[0]?.timeSeries?.[0]?.areas?.[0]?.weathers?.[0] || '';
-            let rainProb = 0;
-            try {
-              const ps = fc[0]?.timeSeries?.find(ts => ts.areas?.[0]?.pops !== undefined);
-              if (ps) { const p = ps.areas[0].pops.slice(0,4).filter(x=>x!=='--'); if(p.length) rainProb=Math.max(...p.map(Number)); }
-            } catch(_) {}
-            let wxTemp = '';
-            try {
-              const ts = fc[0]?.timeSeries?.find(ts => ts.areas?.[0]?.temps !== undefined);
-              if (ts) { const t=ts.areas[0].temps; wxTemp = (t.length>=2&&t[1]!=='--')?t[1]:(t[0]!=='--'?t[0]:''); }
-            } catch(_) {}
-            return { wxDesc: wxDesc.replace(/\s+/g,' ').trim(), rainProb, wxTemp };
-          }
-
-          const snap = await db.doc('users/default').get();
-          if (!snap.exists) { console.log('No user data.'); process.exit(0); }
-          const { pushSubscription, notifRain, notifMorning, lat, lon, todaySchedule } = snap.data();
-          if (!pushSubscription) { console.log('No push subscription.'); process.exit(0); }
-          if (!notifRain && !notifMorning) { console.log('Notifications disabled.'); process.exit(0); }
-
-          let weather;
-          try { weather = await fetchWeather(lat??35.6895, lon??139.6917); }
-          catch(e) { console.error('Weather fetch failed:', e.message); weather={wxDesc:'',rainProb:0,wxTemp:''}; }
-          console.log('Weather:', weather);
-
-          const payload = JSON.stringify({
-            rainProb: weather.rainProb, schedule: todaySchedule||[],
-            notifRain: !!notifRain, notifSchedule: !!notifMorning,
-            wxDesc: weather.wxDesc, wxTemp: weather.wxTemp,
-          });
-          try {
-            await webpush.sendNotification(JSON.parse(pushSubscription), payload);
-            console.log('Web Push sent successfully.');
-          } catch(e) {
-            console.error('Web Push send failed:', e.statusCode, e.message);
-            if (e.statusCode===404||e.statusCode===410) {
-              await db.doc('users/default').update({ pushSubscription: null });
-              console.log('Invalid subscription cleared.');
-            }
-            process.exit(1);
-          }
-          SCRIPT
-          node /tmp/notify/send-notify.mjs
+        run: node scripts/send-notify.mjs
         env:
           FIREBASE_PROJECT_ID:   ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}

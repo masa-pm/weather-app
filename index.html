@@ -430,6 +430,86 @@ body{
   .cd.today.selected { background: #3d3d3d; color: #fff; border: none; }
   .cd.empty { pointer-events: none; }
 
+/* ═══════════════════════════════════════
+   MARKET SCREEN
+   ═══════════════════════════════════════ */
+.mkt-hdr{
+  background:#3d3d3d;
+  padding:2px 24px 18px;color:#fff;flex-shrink:0;
+}
+.mkt-hdr-title{font-family:"Outfit",sans-serif;font-size:22px;font-weight:300;margin-top:8px;letter-spacing:-0.5px;}
+.mkt-hdr-sub{font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px;letter-spacing:0.5px;}
+
+.mkt-tabs{
+  display:flex;background:#fff;
+  border-bottom:1px solid #ebebea;flex-shrink:0;
+}
+.mkt-tab{
+  flex:1;padding:12px 0;text-align:center;
+  font-size:12px;font-weight:500;color:#aaa;cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .2s;
+}
+.mkt-tab.active{color:#1c1c1c;border-bottom-color:#3d3d3d;}
+
+.mkt-body{flex:1;overflow-y:auto;background:#f7f7f5;scrollbar-width:none;padding-bottom:70px;}
+.mkt-body::-webkit-scrollbar{display:none}
+
+.mkt-pane{display:none;padding:14px 16px;}
+.mkt-pane.active{display:block;}
+
+/* Price badges */
+.mkt-prices{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.mkt-badge{
+  background:#fff;border:1px solid #ebebea;border-radius:10px;
+  padding:7px 10px;min-width:82px;
+}
+.mkt-badge-label{font-size:8px;font-weight:600;color:#aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
+.mkt-badge-val{font-family:"DM Mono",monospace;font-size:12px;font-weight:500;color:#1c1c1c;}
+.mkt-badge-chg{font-family:"DM Mono",monospace;font-size:10px;margin-top:1px;}
+.mkt-badge-chg.up{color:#27ae60;}
+.mkt-badge-chg.dn{color:#e74c3c;}
+.mkt-badge-chg.flat{color:#aaa;}
+
+/* Text cards */
+.mkt-text-card{
+  background:#fff;border-radius:12px;padding:14px 16px;
+  border:1px solid #ebebea;
+  font-size:13px;line-height:1.85;color:#333;
+  white-space:pre-wrap;
+}
+.mkt-section-lbl{
+  font-size:9px;font-weight:600;color:#aaa;
+  letter-spacing:2px;text-transform:uppercase;
+  margin-bottom:10px;
+}
+
+/* Points list */
+.mkt-points-list{list-style:none;padding:0;margin:0;}
+.mkt-points-list li{
+  background:#fff;border-radius:12px;padding:12px 14px;
+  margin-bottom:8px;border:1px solid #ebebea;
+  font-size:13px;line-height:1.65;color:#333;
+  display:flex;gap:10px;align-items:flex-start;
+}
+.mkt-points-list li::before{
+  content:'▸';color:#555;font-size:11px;flex-shrink:0;margin-top:2px;
+}
+
+/* Home market mini card */
+.mkt-mini-card{
+  background:#fff;border-radius:12px;padding:12px 14px;
+  margin-bottom:12px;border:1px solid #ebebea;
+  box-shadow:0 1px 6px rgba(0,0,0,0.05);
+}
+.mkt-mini-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f0f0ee;
+  font-size:9px;font-weight:600;color:#aaa;
+  letter-spacing:2px;text-transform:uppercase;
+}
+.mkt-mini-date{font-size:9px;color:#ccc;letter-spacing:0.5px;font-weight:400;}
+.mkt-mini-text{font-size:12px;line-height:1.75;color:#444;}
+
 </style>
 </head>
 <body>
@@ -486,6 +566,16 @@ body{
 
     <!-- Schedule Scroll Area -->
     <div class="sch-area">
+
+      <!-- Market mini card -->
+      <div class="mkt-mini-card" id="home-market-card" style="display:none">
+        <div class="mkt-mini-hdr">
+          <span>📈 マーケット</span>
+          <span class="mkt-mini-date" id="home-mkt-date"></span>
+        </div>
+        <div class="mkt-mini-text" id="home-mkt-summary">読み込み中…</div>
+      </div>
+
       <div class="sch-ttl" style="display:flex;align-items:center;justify-content:space-between;padding-right:8px">
         <span>📅 今週の予定</span>
         <button onclick="gcalSync();renderHomeSchedule();" style="background:none;border:none;font-size:18px;cursor:pointer;color:#555">&#x21bb;</button>
@@ -623,6 +713,41 @@ body{
     </div><!-- /set-body -->
   </div><!-- /screen-settings -->
 
+  <!-- ═══════════ MARKET SCREEN ═══════════ -->
+  <div class="screen" id="screen-market">
+    <div class="mkt-hdr">
+      <div class="mkt-hdr-title">📈 マーケット</div>
+      <div class="mkt-hdr-sub" id="mkt-updated">読み込み中…</div>
+    </div>
+    <div class="mkt-tabs">
+      <div class="mkt-tab active" onclick="switchMktTab('summary',this)">サマリ</div>
+      <div class="mkt-tab" onclick="switchMktTab('factors',this)">要因分析</div>
+      <div class="mkt-tab" onclick="switchMktTab('points',this)">注目ポイント</div>
+    </div>
+    <div class="mkt-body">
+
+      <!-- サマリ -->
+      <div class="mkt-pane active" id="mkt-pane-summary">
+        <div class="mkt-prices" id="mkt-prices"></div>
+        <div class="mkt-section-lbl">今日の概況</div>
+        <div class="mkt-text-card" id="mkt-summary-text">読み込み中…</div>
+      </div>
+
+      <!-- 要因分析 -->
+      <div class="mkt-pane" id="mkt-pane-factors">
+        <div class="mkt-section-lbl">相場変動の要因</div>
+        <div class="mkt-text-card" id="mkt-factors-text">読み込み中…</div>
+      </div>
+
+      <!-- 注目ポイント -->
+      <div class="mkt-pane" id="mkt-pane-points">
+        <div class="mkt-section-lbl">本日の注目ポイント</div>
+        <ul class="mkt-points-list" id="mkt-points-list"></ul>
+      </div>
+
+    </div>
+  </div><!-- /screen-market -->
+
   <!-- ─── Notification Permission Dialog ─── -->
   <div class="notif-overlay" id="notifOverlay" style="display:none">
     <div class="notif-sheet">
@@ -651,6 +776,10 @@ body{
     <div class="nav-item" onclick="switchScreen('calendar',this)">
       <div class="nav-dot"></div><div class="nav-pill"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
       <span class="nav-label">カレンダー</span>
+    </div>
+    <div class="nav-item" onclick="switchScreen('market',this)">
+      <div class="nav-dot"></div><div class="nav-pill"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <span class="nav-label">マーケット</span>
     </div>
     <div class="nav-item" onclick="switchScreen('settings',this)">
       <div class="nav-dot"></div><div class="nav-pill"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div>
@@ -1031,6 +1160,107 @@ function switchScreen(name, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
   el.classList.add('active');
+  if (name === 'market') renderMarketScreen();
+}
+
+// ─── Market tab switching ─────────────────────────────────────────────────────
+function switchMktTab(tab, el) {
+  document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.mkt-pane').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('mkt-pane-' + tab)?.classList.add('active');
+}
+
+// ─── Market data ──────────────────────────────────────────────────────────────
+let marketData = null;
+
+const MKT_PRICE_LABELS = {
+  nikkei: '日経',
+  topix:  'TOPIX',
+  sp500:  'S&P',
+  nasdaq: 'NDQ',
+  dow:    'DOW',
+  usdjpy: '$/¥',
+  wti:    'WTI',
+};
+const MKT_PRICE_ORDER = ['nikkei','topix','sp500','nasdaq','dow','usdjpy','wti'];
+
+function fmtMktPrice(key, p) {
+  if (key === 'usdjpy') return p.value.toFixed(2);
+  if (key === 'wti')    return p.value.toFixed(2);
+  if (p.value >= 1000)  return Math.round(p.value).toLocaleString('ja-JP');
+  return p.value.toFixed(2);
+}
+
+async function loadMarketData() {
+  try {
+    const doc = await _db.doc('market/latest').get();
+    if (!doc.exists) return;
+    marketData = doc.data();
+    renderHomeMarketSummary();
+  } catch (e) {
+    console.warn('[market] Firestore read failed:', e);
+  }
+}
+
+function renderHomeMarketSummary() {
+  const card = document.getElementById('home-market-card');
+  if (!card || !marketData) return;
+  card.style.display = '';
+  const dateEl = document.getElementById('home-mkt-date');
+  if (dateEl) dateEl.textContent = marketData.date || '';
+  const textEl = document.getElementById('home-mkt-summary');
+  if (textEl) textEl.textContent = marketData.summary || 'データがありません';
+}
+
+function renderMarketScreen() {
+  // ヘッダー更新日時
+  const updEl = document.getElementById('mkt-updated');
+  if (updEl) {
+    if (marketData?.updatedAt) {
+      const d = new Date(marketData.updatedAt);
+      const pad = n => String(n).padStart(2,'0');
+      updEl.textContent = `${marketData.date} ${pad(d.getHours())}:${pad(d.getMinutes())} 更新`;
+    } else {
+      updEl.textContent = 'データなし';
+    }
+  }
+
+  if (!marketData) return;
+
+  // 価格バッジ
+  const pricesEl = document.getElementById('mkt-prices');
+  if (pricesEl) {
+    pricesEl.innerHTML = MKT_PRICE_ORDER.map(key => {
+      const p = marketData.prices?.[key];
+      if (!p) return '';
+      const val  = fmtMktPrice(key, p);
+      const sign = p.change >= 0 ? '+' : '';
+      const chgCls = p.change > 0 ? 'up' : p.change < 0 ? 'dn' : 'flat';
+      return `<div class="mkt-badge">
+        <div class="mkt-badge-label">${MKT_PRICE_LABELS[key]}</div>
+        <div class="mkt-badge-val">${val}</div>
+        <div class="mkt-badge-chg ${chgCls}">${sign}${p.change}%</div>
+      </div>`;
+    }).join('');
+  }
+
+  // サマリ
+  const summaryEl = document.getElementById('mkt-summary-text');
+  if (summaryEl) summaryEl.textContent = marketData.summary || 'データがありません';
+
+  // 要因分析
+  const factorsEl = document.getElementById('mkt-factors-text');
+  if (factorsEl) factorsEl.textContent = marketData.factors || 'データがありません';
+
+  // 注目ポイント
+  const pointsEl = document.getElementById('mkt-points-list');
+  if (pointsEl) {
+    const pts = marketData.points || [];
+    pointsEl.innerHTML = pts.length
+      ? pts.map(p => `<li>${escHtml(p)}</li>`).join('')
+      : '<li style="color:#aaa">データがありません</li>';
+  }
 }
 
 // ─── Google Calendar OAuth (GIS) ─────────────────────────────────────────────
@@ -1674,6 +1904,9 @@ window.addEventListener('load', () => {
   if ('Notification' in window && Notification.permission === 'granted') {
     syncFirestore();
   }
+
+  // マーケットデータを Firestore から読み込む
+  loadMarketData();
 
   // Restore toggle states from localStorage
   ['schedule', 'rain', 'morning'].forEach(key => {
