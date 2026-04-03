@@ -1064,7 +1064,6 @@ async function fetchAMeDAS(lat, lon) {
 function applyForecastHeader(fc) {
   const ts      = fc[0]?.timeSeries || [];
   const wxArea  = ts[0]?.areas?.[0];
-  const popTs   = ts[1];
   const tmpArea = ts[2]?.areas?.[0];
 
   // 天気絵文字・説明文
@@ -1074,15 +1073,13 @@ function applyForecastHeader(fc) {
   document.getElementById('wx-desc-text').textContent = desc || '--';
   wxDescCache = desc || '';
 
-  // 今日の降水確率（6時間スロットの最大値）
-  const todayKey = jstDateKey(new Date());
+  // 今日の降水確率（短期予報の先頭4スロット＝今日の6時間値の最大値）
+  const popSeries = ts.find(t => t.areas?.[0]?.pops !== undefined);
   let maxPop = 0;
-  popTs?.timeDefines?.forEach((td, i) => {
-    if (td.startsWith(todayKey)) {
-      const v = parseInt(popTs.areas?.[0]?.pops?.[i]);
-      if (!isNaN(v)) maxPop = Math.max(maxPop, v);
-    }
-  });
+  if (popSeries) {
+    const pops = popSeries.areas[0].pops.slice(0, 4).filter(p => p !== '--');
+    if (pops.length) maxPop = Math.max(...pops.map(Number));
+  }
   document.getElementById('wx-rain-val').textContent = maxPop + '%';
   TODAY_RAIN_PROB = maxPop;
 
@@ -1691,7 +1688,7 @@ function getTodaySchedule() {
   return getSchedules()
     .filter(s => s.date === key)
     .sort((a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99'))
-    .map(s => ({ title: s.title, time: s.startTime || '' }));
+    .map(s => ({ title: s.title, time: s.startTime || '', date: key }));
 }
 const NOTIF_ASKED_KEY = 'notif_asked';
 

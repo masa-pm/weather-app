@@ -137,7 +137,7 @@ try {
 
 console.log('Weather:', weather);
 console.log('notifRain:', notifRain, '  notifMorning:', notifMorning);
-console.log('todaySchedule:', todaySchedule);
+console.log('todaySchedule:', todayScheduleFiltered);
 
 const payload = JSON.stringify({
   rainProb:      weather.rainProb,
