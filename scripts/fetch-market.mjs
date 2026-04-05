@@ -169,11 +169,40 @@ ${newsText || '（ニュース取得中）'}
   "points": ["注目ポイント1（具体的に）", "注目ポイント2", "注目ポイント3", "注目ポイント4"]
 }`;
 
-let analysis = {
-  summary: `${dateKey}のマーケットデータを分析しました。`,
-  factors: '詳細な要因分析はデータ収集中です。',
-  points: [],
-};
+// Gemini失敗時の価格ベースフォールバック生成
+function buildFallbackAnalysis(prices, dateKey) {
+  const fmt = (key, p) => {
+    const label = SYMBOL_LABELS[key] || key;
+    const sign = p.change >= 0 ? '+' : '';
+    let val;
+    if (key === 'usdjpy') val = `${p.value.toFixed(2)}円`;
+    else if (key === 'wti') val = `$${p.value.toFixed(2)}`;
+    else val = p.value.toLocaleString('ja-JP', { maximumFractionDigits: 2 });
+    return `${label} ${val}（${sign}${p.change}%）`;
+  };
+
+  const entries = Object.entries(prices);
+  const summaryLines = entries.map(([k, p]) => fmt(k, p));
+  const up   = entries.filter(([, p]) => p.change > 0).map(([k]) => SYMBOL_LABELS[k]);
+  const down = entries.filter(([, p]) => p.change < 0).map(([k]) => SYMBOL_LABELS[k]);
+  const trend = up.length >= down.length ? '総じて堅調' : '総じて軟調';
+
+  const summary = `${dateKey}のマーケットは${trend}な展開。\n${summaryLines.join(' / ')}`;
+  const factors = up.length > 0 || down.length > 0
+    ? `上昇：${up.join('・') || 'なし'}　下落：${down.join('・') || 'なし'}`
+    : '詳細な要因分析データは取得できませんでした。';
+  const points = entries
+    .sort((a, b) => Math.abs(b[1].change) - Math.abs(a[1].change))
+    .slice(0, 4)
+    .map(([k, p]) => {
+      const sign = p.change >= 0 ? '▲' : '▼';
+      return `${SYMBOL_LABELS[k]} ${sign}${Math.abs(p.change)}%`;
+    });
+
+  return { summary, factors, points };
+}
+
+let analysis = buildFallbackAnalysis(prices, dateKey);
 
 try {
   const geminiRaw = await callGemini(prompt);

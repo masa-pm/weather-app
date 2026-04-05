@@ -440,22 +440,10 @@ body{
 .mkt-hdr-title{font-family:"Outfit",sans-serif;font-size:22px;font-weight:300;margin-top:8px;letter-spacing:-0.5px;}
 .mkt-hdr-sub{font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px;letter-spacing:0.5px;}
 
-.mkt-tabs{
-  display:flex;background:#fff;
-  border-bottom:1px solid #ebebea;flex-shrink:0;
-}
-.mkt-tab{
-  flex:1;padding:12px 0;text-align:center;
-  font-size:12px;font-weight:500;color:#aaa;cursor:pointer;
-  border-bottom:2px solid transparent;transition:all .2s;
-}
-.mkt-tab.active{color:#1c1c1c;border-bottom-color:#3d3d3d;}
-
 .mkt-body{flex:1;overflow-y:auto;background:#f7f7f5;scrollbar-width:none;padding-bottom:70px;}
 .mkt-body::-webkit-scrollbar{display:none}
 
-.mkt-pane{display:none;padding:14px 16px;}
-.mkt-pane.active{display:block;}
+.mkt-pane{padding:14px 16px;}
 
 /* Price badges */
 .mkt-prices{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
@@ -719,29 +707,15 @@ body{
       <div class="mkt-hdr-title">📈 マーケット</div>
       <div class="mkt-hdr-sub" id="mkt-updated">読み込み中…</div>
     </div>
-    <div class="mkt-tabs">
-      <div class="mkt-tab active" onclick="switchMktTab('summary',this)">サマリ</div>
-      <div class="mkt-tab" onclick="switchMktTab('factors',this)">要因分析</div>
-      <div class="mkt-tab" onclick="switchMktTab('points',this)">注目ポイント</div>
-    </div>
     <div class="mkt-body">
 
-      <!-- サマリ -->
-      <div class="mkt-pane active" id="mkt-pane-summary">
+      <div class="mkt-pane">
         <div class="mkt-prices" id="mkt-prices"></div>
         <div class="mkt-section-lbl">今日の概況</div>
         <div class="mkt-text-card" id="mkt-summary-text">読み込み中…</div>
-      </div>
-
-      <!-- 要因分析 -->
-      <div class="mkt-pane" id="mkt-pane-factors">
-        <div class="mkt-section-lbl">相場変動の要因</div>
+        <div class="mkt-section-lbl" style="margin-top:14px">相場変動の要因</div>
         <div class="mkt-text-card" id="mkt-factors-text">読み込み中…</div>
-      </div>
-
-      <!-- 注目ポイント -->
-      <div class="mkt-pane" id="mkt-pane-points">
-        <div class="mkt-section-lbl">本日の注目ポイント</div>
+        <div class="mkt-section-lbl" style="margin-top:14px">本日の注目ポイント</div>
         <ul class="mkt-points-list" id="mkt-points-list"></ul>
       </div>
 
@@ -1160,13 +1134,6 @@ function switchScreen(name, el) {
   if (name === 'market') renderMarketScreen();
 }
 
-// ─── Market tab switching ─────────────────────────────────────────────────────
-function switchMktTab(tab, el) {
-  document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.mkt-pane').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('mkt-pane-' + tab)?.classList.add('active');
-}
 
 // ─── Market data ──────────────────────────────────────────────────────────────
 let marketData = null;
