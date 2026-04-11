@@ -1162,6 +1162,9 @@ async function loadMarketData() {
     if (!doc.exists) return;
     marketData = doc.data();
     renderHomeMarketSummary();
+    if (document.getElementById('screen-market')?.classList.contains('active')) {
+      renderMarketScreen();
+    }
   } catch (e) {
     console.warn('[market] Firestore read failed:', e);
   }
