@@ -30,6 +30,7 @@ const _db = firebase.firestore();
 <meta name="apple-mobile-web-app-title" content="天気アプリ">
 <link rel="apple-touch-icon" href="icon-192.svg">
 <style>
+:root{--accent:#3d3d3d}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 body{
@@ -103,7 +104,7 @@ body{
 
 /* Weather Header */
 .wx-hdr{
-  background:#3d3d3d;
+  background:var(--accent);
   padding:2px 24px 22px;color:#fff;flex-shrink:0;
   position:relative;overflow:hidden;
 }
@@ -169,7 +170,7 @@ body{
 .dc-date{font-size:11px;color:#aaa;letter-spacing:0.5px;}
 .today-chip{
   font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  background:#3d3d3d;color:#fff;
+  background:var(--accent);color:#fff;
   padding:2px 7px;border-radius:4px;
 }
 .dc-right{display:flex;align-items:center;gap:4px}
@@ -190,7 +191,7 @@ body{
    CALENDAR SCREEN
    ═══════════════════════════════════════ */
 .cal-hdr{
-  background:#3d3d3d;
+  background:var(--accent);
   padding:4px 16px 16px;color:#fff;flex-shrink:0;
   display:flex;align-items:center;justify-content:space-between;
 }
@@ -216,7 +217,7 @@ body{
 .cd.sun{color:#c0392b;}
 .cd.sat{color:#888;}
 .cd.other{color:#d0d0d0;}
-.cd.today{background:#3d3d3d;color:#fff;font-weight:600;}
+.cd.today{background:var(--accent);color:#fff;font-weight:600;}
 .cd.today.sun,.cd.today.sat{color:#fff;}
 .cd.has-ev::after{
   content:'';width:4px;height:4px;border-radius:50%;
@@ -248,7 +249,7 @@ body{
    SETTINGS SCREEN
    ═══════════════════════════════════════ */
 .set-hdr{
-  background:#3d3d3d;
+  background:var(--accent);
   padding:2px 24px 18px;color:#fff;flex-shrink:0;
 }
 .set-hdr-title{font-family:"Outfit",sans-serif;font-size:22px;font-weight:300;margin-top:8px;letter-spacing:-0.5px;}
@@ -269,7 +270,7 @@ body{
 .set-ico{
   width:34px;height:34px;border-radius:8px;
   display:flex;align-items:center;justify-content:center;
-  font-size:16px;flex-shrink:0;background:#f0f0ee;color:#3d3d3d;
+  font-size:16px;flex-shrink:0;background:#f0f0ee;color:var(--accent);
 }
 .ico-b{background:#f0f0ee;}
 .ico-g{background:#f0f0ee;}
@@ -302,7 +303,7 @@ body{
 }
 .btn:active{opacity:.8}
 .btn-disconnect{border-color:#e0dedd;color:#c0392b;background:none;}
-.btn-connect-sm{background:#3d3d3d;color:#fff;border-color:#3d3d3d;}
+.btn-connect-sm{background:var(--accent);color:#fff;border-color:var(--accent);}
 .btn-danger{border-color:#e0dedd;color:#c0392b;background:none;}
 
 /* Text input */
@@ -312,7 +313,7 @@ body{
   width:130px;outline:none;font-family:inherit;
   background:#f7f7f5;transition:border-color .2s;
 }
-.set-input:focus{border-color:#3d3d3d;}
+.set-input:focus{border-color:var(--accent);}
 
 /* Select */
 .set-select{
@@ -327,7 +328,7 @@ body{
   border-radius:13px;position:relative;cursor:pointer;
   transition:background .3s;flex-shrink:0;
 }
-.toggle.on{background:#3d3d3d}
+.toggle.on{background:var(--accent)}
 .toggle::after{
   content:'';position:absolute;width:20px;height:20px;
   background:#fff;border-radius:50%;top:3px;left:3px;
@@ -373,7 +374,7 @@ body{
 }
 .notif-btn-allow{
   width:100%;padding:14px;
-  background:linear-gradient(90deg,#3d3d3d,#3d3d3d);
+  background:var(--accent);
   color:#fff;border:none;border-radius:14px;
   font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
   box-shadow:0 4px 14px rgba(25,118,210,0.35);
@@ -395,11 +396,20 @@ body{
 .save-btn{
   display:block;width:calc(100% - 32px);margin:0 16px 16px;
   padding:14px;border-radius:12px;border:none;
-  background:#3d3d3d;color:#fff;
+  background:var(--accent);color:#fff;
   font-size:14px;font-weight:600;letter-spacing:0.5px;
   cursor:pointer;font-family:inherit;
 }
 .save-btn:active{transform:scale(0.98)}
+
+/* ─── Theme swatches ─── */
+.theme-swatch{
+  width:28px;height:28px;border-radius:50%;border:2px solid transparent;
+  cursor:pointer;transition:transform .15s,border-color .15s;padding:0;
+  flex-shrink:0;
+}
+.theme-swatch:active{transform:scale(0.9)}
+.theme-swatch.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent),0 2px 6px rgba(0,0,0,0.3);}
 
 /* ─── Mobile: full screen (≤600px) ─── */
 @media (max-width: 600px) {
@@ -425,16 +435,16 @@ body{
     line-height: 1;
   }
   .cal-hdr { display: flex; align-items: center; justify-content: space-between; }
-  .cd.selected { background: #3d3d3d; border-radius: 50%; font-weight: 600; color: #fff; }
-  .cd.today { background: transparent; color: #3d3d3d; font-weight: 600; border: 2px solid #3d3d3d; }
-  .cd.today.selected { background: #3d3d3d; color: #fff; border: none; }
+  .cd.selected { background:var(--accent); border-radius: 50%; font-weight: 600; color: #fff; }
+  .cd.today { background: transparent; color: var(--accent); font-weight: 600; border:2px solid var(--accent); }
+  .cd.today.selected { background:var(--accent); color: #fff; border: none; }
   .cd.empty { pointer-events: none; }
 
 /* ═══════════════════════════════════════
    MARKET SCREEN
    ═══════════════════════════════════════ */
 .mkt-hdr{
-  background:#3d3d3d;
+  background:var(--accent);
   padding:2px 24px 18px;color:#fff;flex-shrink:0;
 }
 .mkt-hdr-title{font-family:"Outfit",sans-serif;font-size:22px;font-weight:300;margin-top:8px;letter-spacing:-0.5px;}
@@ -671,6 +681,25 @@ body{
           <button class="btn btn-connect-sm" onclick="openNotifPermission()" style="width:100%;padding:11px;font-size:13px">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> 通知の許可設定を開く
           </button>
+        </div>
+      </div>
+
+      <!-- Theme -->
+      <div class="set-sec">
+        <div class="set-sec-lbl">テーマカラー</div>
+        <div class="set-row" style="gap:14px;flex-wrap:wrap">
+          <div class="set-ico ico-p">🎨</div>
+          <div class="set-info">
+            <div class="set-lbl">カラーテーマ</div>
+            <div class="set-sub">アプリ全体のアクセントカラーを変更</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0" id="theme-swatches">
+            <button class="theme-swatch" data-color="#3d3d3d" title="ダーク" style="background:#3d3d3d"></button>
+            <button class="theme-swatch" data-color="#1976D2" title="ブルー" style="background:#1976D2"></button>
+            <button class="theme-swatch" data-color="#2E7D32" title="グリーン" style="background:#2E7D32"></button>
+            <button class="theme-swatch" data-color="#C2185B" title="ローズ" style="background:#C2185B"></button>
+            <button class="theme-swatch" data-color="#6A1B9A" title="パープル" style="background:#6A1B9A"></button>
+          </div>
         </div>
       </div>
 
@@ -1855,8 +1884,29 @@ function updateNotifBadge(perm) {
   }
 }
 
+// ─── Theme ────────────────────────────────────────────────────────────────────
+function applyTheme(color) {
+  document.documentElement.style.setProperty('--accent', color);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', color);
+  document.querySelectorAll('.theme-swatch').forEach(el => {
+    el.classList.toggle('active', el.dataset.color === color);
+  });
+  localStorage.setItem('app_theme', color);
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('app_theme') || '#3d3d3d';
+  applyTheme(saved);
+  document.querySelectorAll('.theme-swatch').forEach(el => {
+    el.addEventListener('click', () => applyTheme(el.dataset.color));
+  });
+}
+
 // ─── Init on load ─────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
+  // テーマ復元
+  initTheme();
+
   // 設定を復元してから天気データ取得
   loadWeatherSettings();
   initWeather();
