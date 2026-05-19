@@ -39,9 +39,21 @@ self.addEventListener('activate', event => {
   );
 });
 
+const CACHE_EXCLUDE_HOSTS = [
+  'www.jma.go.jp', 'msearch.gsi.go.jp',
+  'www.googleapis.com', 'firestore.googleapis.com',
+  'generativelanguage.googleapis.com',
+  'accounts.google.com', 'fonts.googleapis.com', 'fonts.gstatic.com',
+];
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
+  // 外部APIはキャッシュしない
+  if (CACHE_EXCLUDE_HOSTS.some(h => url.hostname.includes(h))) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   // HTMLはHTTPキャッシュも使わず常にサーバーから取得
   if (url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
     event.respondWith(
