@@ -1237,7 +1237,7 @@ function renderMarketScreen() {
       return `<div class="mkt-badge">
         <div class="mkt-badge-label">${MKT_PRICE_LABELS[key]}</div>
         <div class="mkt-badge-val">${val}</div>
-        <div class="mkt-badge-chg ${chgCls}">${sign}${p.change}%</div>
+        <div class="mkt-badge-chg ${chgCls}">${sign}${Number(p.change)}%</div>
       </div>`;
     }).join('');
   }
@@ -1558,7 +1558,7 @@ function renderEventList(dateKey) {
           <div class="cal-ev-dot dot-blue"></div>
           <div class="cal-ev-info">
             <div class="cal-ev-name">${escHtml(ev.title)}</div>
-            <div class="cal-ev-time">${timeStr}</div>
+            <div class="cal-ev-time">${escHtml(timeStr)}</div>
           </div>
         </div>`;
     });
