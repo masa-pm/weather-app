@@ -14,7 +14,7 @@ self.addEventListener('push', event => {
   }));
 });
 
-const CACHE_NAME = 'wx-app-v11';
+const CACHE_NAME = 'wx-app-v12';
 const PRECACHE = [
   './manifest.json',
   './icon-192.svg',
@@ -119,8 +119,9 @@ function scheduleTimer(delay, payload) {
   }, delay);
 }
 
-function fireNotifications(payload) {
+async function fireNotifications(payload) {
   const { rainProb, schedule, notifRain, notifSchedule, wxDesc, wxTemp } = payload;
+  const promises = [];
 
   // 朝のまとめ通知
   if (notifSchedule) {
@@ -131,25 +132,27 @@ function fireNotifications(payload) {
     } else {
       body += '\n📅 今日の予定はありません';
     }
-    self.registration.showNotification('今日の天気と予定', {
+    promises.push(self.registration.showNotification('今日の天気と予定', {
       body,
       icon: './icon-192.svg',
       badge: './icon-192.svg',
       tag: 'wx-morning',
       vibrate: [200, 100, 200],
-    });
+    }));
   }
 
   // 雨の通知
   if (notifRain && rainProb >= 30) {
-    self.registration.showNotification('☂️ 今日は雨の可能性があります', {
+    promises.push(self.registration.showNotification('☂️ 今日は雨の可能性があります', {
       body: `降水確率${rainProb}%。傘をお忘れなく！`,
       icon: './icon-192.svg',
       badge: './icon-192.svg',
       tag: 'wx-rain',
       vibrate: [200, 100, 200],
-    });
+    }));
   }
+
+  return Promise.all(promises);
 }
 
 self.addEventListener('notificationclick', event => {
