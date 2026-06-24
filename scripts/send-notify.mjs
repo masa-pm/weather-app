@@ -154,10 +154,11 @@ try {
   console.log('Web Push sent successfully.');
 } catch (e) {
   console.error('Web Push send failed:', e.statusCode, e.message);
-  // サブスクリプション無効の場合は Firestore をクリア
+  // サブスクリプション無効の場合は Firestore をクリアして正常終了
   if (e.statusCode === 404 || e.statusCode === 410) {
     await db.doc('users/default').update({ pushSubscription: null });
     console.log('Invalid subscription cleared from Firestore.');
+    process.exit(0);
   }
   process.exit(1);
 }
