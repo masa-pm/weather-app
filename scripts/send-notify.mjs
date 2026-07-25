@@ -55,6 +55,22 @@ const JMA_PREFS = [
   [26.21, 127.68, '471000', '沖縄県'],
 ];
 
+// syncUserSettings 側と同じチェック。Firestoreの内容を他経路(コンソール操作等)で
+// 直接書き換えられた場合にも、任意URLへPOSTしてしまうSSRFを防ぐ。
+function isAllowedPushEndpoint(urlString) {
+  let u;
+  try {
+    u = new URL(urlString);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:') return false;
+  const host = u.hostname;
+  const allowedExact = ['fcm.googleapis.com', 'updates.push.services.mozilla.com'];
+  const allowedSuffixes = ['.push.apple.com', '.notify.windows.com'];
+  return allowedExact.includes(host) || allowedSuffixes.some((suf) => host.endsWith(suf));
+}
+
 function getNearestPref(lat, lon) {
   let best = JMA_PREFS[0], bestD = Infinity;
   for (const p of JMA_PREFS) {
@@ -150,6 +166,11 @@ const payload = JSON.stringify({
 
 try {
   const sub = JSON.parse(pushSubscription);
+  if (!sub || !isAllowedPushEndpoint(sub.endpoint)) {
+    console.error('Refusing to send: invalid or disallowed push endpoint.');
+    await db.doc('users/default').update({ pushSubscription: null });
+    process.exit(0);
+  }
   await webpush.sendNotification(sub, payload);
   console.log('Web Push sent successfully.');
 } catch (e) {

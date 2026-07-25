@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /market/{doc} {
+      allow read: if true;
+      allow write: if false; // fetch-market.mjs が Admin SDK 経由で書き込み
+    }
+
+    match /users/{userId} {
+      // クライアントからの直接アクセスは禁止。
+      // 書き込みは functions/syncUserSettings（Admin SDK）経由のみ。
+      allow read, write: if false;
+    }
+
+    match /planning/{shareId} {
+      // 未使用コレクション
+      allow read, write: if false;
+    }
+
+    match /diet_meals/{dateKey} {
+      // 未実装（現状は明示ルールが無く既定で拒否されている状態と同じ）
+      allow read, write: if false;
+    }
+  }
+}

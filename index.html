@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com; connect-src https://www.jma.go.jp https://msearch.gsi.go.jp https://www.googleapis.com https://firestore.googleapis.com wss://firestore.googleapis.com https://generativelanguage.googleapis.com https://firebaseinstallations.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://www.google.com; frame-src https://www.google.com; connect-src https://www.jma.go.jp https://msearch.gsi.go.jp https://www.googleapis.com https://firestore.googleapis.com wss://firestore.googleapis.com https://generativelanguage.googleapis.com https://firebaseinstallations.googleapis.com https://firebaseappcheck.googleapis.com https://content-firebaseappcheck.googleapis.com https://us-central1-my-weather-app-77971.cloudfunctions.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;">
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>天気＆スケジュール</title>
@@ -11,7 +11,9 @@
 <script src="https://accounts.google.com/gsi/client" async></script>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script>
 firebase.initializeApp({
   apiKey: 'AIzaSyDZhSzqZ4pt6HZ3PeEzeYo-kd_3wh6m7Eo',
@@ -21,7 +23,22 @@ firebase.initializeApp({
   messagingSenderId: '896788626272',
   appId: '1:896788626272:web:af4c8a6eca51a036d7fc05',
 });
+// localhost/ngrokなどreCAPTCHA v3が使えない開発環境ではデバッグトークンを使う。
+// 本番ドメイン(masa-pm.github.io)ではこの分岐に入らないため無効化されない。
+if (location.hostname === 'localhost' || location.hostname.endsWith('.ngrok-free.app') || location.hostname.endsWith('.ngrok.io')) {
+  // 固定値にしておくことで、シークレットウィンドウ等ストレージが無い状態でも
+  // 毎回同じデバッグトークンになり、Firebase Console側への再登録が不要になる。
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = '0c76d483-0d0b-432f-a0e7-a94ae428cf52';
+}
+// reCAPTCHAはbody要素へのDOM挿入を行うため、head内で即時実行するとbody未生成でエラーになる。
+document.addEventListener('DOMContentLoaded', () => {
+  firebase.appCheck().activate(
+    new firebase.appCheck.ReCaptchaV3Provider('6LdwDGUtAAAAAP-7sThIjzkoxOjWq07v6pOvpglq'),
+    true,
+  );
+});
 const _db = firebase.firestore();
+const _syncUserSettings = firebase.functions().httpsCallable('syncUserSettings');
 </script>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -1785,7 +1802,7 @@ async function syncFirestore() {
     const todaySchedule = getTodaySchedule();
     const data = { lat, lon, notifRain, notifMorning, todaySchedule };
     if (sub) data.pushSubscription = JSON.stringify(sub);
-    await _db.doc('users/default').set(data, { merge: true });
+    await _syncUserSettings(data);
     console.log('[Firestore] synced');
   } catch (e) {
     console.warn('[Firestore] sync failed', e);
